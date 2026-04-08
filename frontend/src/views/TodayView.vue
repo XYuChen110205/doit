@@ -1,0 +1,913 @@
+<template>
+  <div class="today-view">
+    <!-- 左栏：任务列表 -->
+    <div class="tasks-section">
+      <!-- 日期导航 -->
+      <div class="date-header">
+        <button class="nav-arrow" @click="changeDate(-1)">
+          <span class="arrow-left"></span>
+        </button>
+        <div class="date-display">
+          <span class="date-text">{{ formattedDate }}</span>
+          <span class="weekday">{{ weekday }}</span>
+        </div>
+        <button class="nav-arrow" @click="changeDate(1)">
+          <span class="arrow-right"></span>
+        </button>
+      </div>
+
+      <!-- 标签筛选 -->
+      <div class="tag-filter-bar">
+        <span class="filter-label">筛选:</span>
+        <div class="filter-tags">
+          <button
+            class="filter-tag all"
+            :class="{ active: filterTagId === null }"
+            @click="filterTagId = null"
+          >
+            全部
+          </button>
+          <button
+            v-for="tag in allTags"
+            :key="tag.id"
+            class="filter-tag"
+            :class="{ active: filterTagId === tag.id }"
+            :style="{
+              backgroundColor: filterTagId === tag.id ? tag.color : 'transparent',
+              borderColor: tag.color,
+              color: filterTagId === tag.id ? '#fff' : tag.color
+            }"
+            @click="filterTagId = tag.id"
+          >
+            {{ tag.name }}
+          </button>
+        </div>
+      </div>
+
+      <!-- 添加任务 - 必须先选标签 -->
+      <div class="add-task-container">
+        <div class="tag-selection">
+          <span class="selection-label">1. 选择标签 (必须)</span>
+          <div class="tag-pool">
+            <button
+              v-for="tag in allTags"
+              :key="tag.id"
+              class="tag-choice"
+              :class="{ selected: selectedTagId === tag.id }"
+              :style="{ backgroundColor: selectedTagId === tag.id ? tag.color : 'transparent', borderColor: tag.color }"
+              @click="selectedTagId = tag.id"
+            >
+              {{ tag.name }}
+            </button>
+            <router-link v-if="allTags.length === 0" to="/tags" class="create-tag-link">
+              + 创建标签
+            </router-link>
+          </div>
+        </div>
+        <div class="task-input-section" :class="{ disabled: !selectedTagId }">
+          <span class="selection-label">2. 输入内容</span>
+          <input
+            v-model="newTaskTitle"
+            type="text"
+            class="task-input"
+            :placeholder="selectedTagId ? '输入任务内容...' : '请先选择标签'"
+            :disabled="!selectedTagId"
+            @keyup.enter="createTask"
+          />
+          <button
+            class="add-btn"
+            :disabled="!canCreate"
+            @click="createTask"
+          >
+            添加
+          </button>
+        </div>
+      </div>
+
+      <!-- 任务列表 -->
+      <div class="task-list">
+        <!-- 未完成任务 -->
+        <div class="task-group">
+          <div
+            v-for="task in filteredPendingTasks"
+            :key="task.id"
+            class="task-item"
+          >
+            <div class="task-tags-row">
+              <span
+                v-for="tag in task.tags"
+                :key="tag.id"
+                class="task-tag"
+                :style="{ backgroundColor: tag.color }"
+              >
+                {{ tag.name }}
+              </span>
+            </div>
+            <div class="task-main">
+              <button class="checkbox" @click="toggleTaskStatus(task)">
+                <span class="check-icon"></span>
+              </button>
+              <span class="task-title">{{ task.title }}</span>
+              <button class="delete-btn" @click="deleteTask(task.id)">×</button>
+            </div>
+          </div>
+          <div v-if="filteredPendingTasks.length === 0" class="empty-state">
+            {{ filterTagId ? '该标签下暂无任务' : '暂无任务，添加一个吧' }}
+          </div>
+        </div>
+
+        <!-- 已完成任务 -->
+        <div v-if="filteredCompletedTasks.length > 0" class="completed-section">
+          <button class="toggle-completed" @click="showCompleted = !showCompleted">
+            <span class="toggle-icon" :class="{ expanded: showCompleted }"></span>
+            <span class="toggle-text">已完成 {{ filteredCompletedTasks.length }}</span>
+          </button>
+          <div v-show="showCompleted" class="task-group completed">
+            <div
+              v-for="task in filteredCompletedTasks"
+              :key="task.id"
+              class="task-item done"
+            >
+              <div class="task-tags-row">
+                <span
+                  v-for="tag in task.tags"
+                  :key="tag.id"
+                  class="task-tag"
+                  :style="{ backgroundColor: tag.color }"
+                >
+                  {{ tag.name }}
+                </span>
+              </div>
+              <div class="task-main">
+                <button class="checkbox checked" @click="toggleTaskStatus(task)">
+                  <span class="check-icon"></span>
+                </button>
+                <span class="task-title">{{ task.title }}</span>
+                <button class="delete-btn" @click="deleteTask(task.id)">×</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 右栏：笔记编辑器 -->
+    <div class="notes-section">
+      <div class="notes-card">
+        <h2 class="notes-title">今日笔记</h2>
+        <textarea
+          v-model="noteContent"
+          class="notes-textarea"
+          placeholder="今天有什么想记录的..."
+          @blur="saveNote"
+          @input="onNoteInput"
+        ></textarea>
+        <div class="save-status">
+          <span v-if="saveStatus === 'saving'" class="status-saving">保存中...</span>
+          <span v-else-if="saveStatus === 'saved'" class="status-saved">已保存</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Undo Toast -->
+    <Transition name="toast">
+      <div v-if="deletedTask" class="undo-toast">
+        <span>任务已删除</span>
+        <button class="undo-btn" @click="undoDelete">撤销</button>
+      </div>
+    </Transition>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { ref, computed, watch, onMounted } from 'vue'
+import type { Task, CreateTaskRequest, Tag } from '../types'
+import { createTask as apiCreateTask, getTasksByDate, updateTask, deleteTask as apiDeleteTask } from '../api/tasks'
+import { getNoteByDate, saveNote as apiSaveNote } from '../api/notes'
+import { listTags } from '../api/tags'
+import { addTagToTask } from '../api/task_tags'
+
+// 当前日期
+const currentDate = ref(new Date())
+
+// 任务相关
+const tasks = ref<Task[]>([])
+const newTaskTitle = ref('')
+const selectedTagId = ref<number | null>(null)
+const filterTagId = ref<number | null>(null)
+const showCompleted = ref(false)
+const deletedTask = ref<Task | null>(null)
+let deleteTimer: ReturnType<typeof setTimeout> | null = null
+const allTags = ref<Tag[]>([])
+
+// 笔记相关
+const noteContent = ref('')
+const saveStatus = ref<'idle' | 'saving' | 'saved'>('idle')
+let saveTimer: ReturnType<typeof setTimeout> | null = null
+let autoSaveTimer: ReturnType<typeof setTimeout> | null = null
+
+// 计算属性：格式化日期
+const formattedDate = computed(() => {
+  const month = currentDate.value.getMonth() + 1
+  const day = currentDate.value.getDate()
+  return `${month}月${day}日`
+})
+
+const weekday = computed(() => {
+  const weekdays = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六']
+  return weekdays[currentDate.value.getDay()]
+})
+
+const dateString = computed(() => {
+  return currentDate.value.toISOString().split('T')[0]
+})
+
+const canCreate = computed(() => selectedTagId.value && newTaskTitle.value.trim())
+
+// 筛选后的任务
+const filteredPendingTasks = computed(() => {
+  let result = tasks.value.filter(t => t.status === 'pending')
+  if (filterTagId.value) {
+    result = result.filter(t => t.tags?.some(tag => tag.id === filterTagId.value))
+  }
+  return result
+})
+
+const filteredCompletedTasks = computed(() => {
+  let result = tasks.value.filter(t => t.status === 'done')
+  if (filterTagId.value) {
+    result = result.filter(t => t.tags?.some(tag => tag.id === filterTagId.value))
+  }
+  return result
+})
+
+// 加载标签
+async function loadTags() {
+  try {
+    allTags.value = await listTags()
+  } catch (error) {
+    console.error('加载标签失败:', error)
+  }
+}
+
+// 加载任务列表
+async function loadTasks() {
+  try {
+    tasks.value = await getTasksByDate(dateString.value)
+  } catch (error) {
+    console.error('加载任务失败:', error)
+  }
+}
+
+// 加载笔记
+async function loadNote() {
+  try {
+    const note = await getNoteByDate(dateString.value)
+    noteContent.value = note?.content || ''
+    saveStatus.value = 'idle'
+  } catch (error) {
+    console.error('加载笔记失败:', error)
+  }
+}
+
+// 切换日期
+function changeDate(days: number) {
+  const newDate = new Date(currentDate.value)
+  newDate.setDate(newDate.getDate() + days)
+  currentDate.value = newDate
+}
+
+// 创建任务
+async function createTask() {
+  if (!canCreate.value) return
+
+  try {
+    const data: CreateTaskRequest = {
+      title: newTaskTitle.value.trim(),
+      due_date: dateString.value,
+      source: 'direct'
+    }
+    const task = await apiCreateTask(data)
+
+    // 添加选中的标签
+    if (selectedTagId.value) {
+      await addTagToTask(task.id, selectedTagId.value)
+    }
+
+    newTaskTitle.value = ''
+    selectedTagId.value = null
+    await loadTasks()
+  } catch (error) {
+    console.error('创建任务失败:', error)
+  }
+}
+
+// 切换任务状态
+async function toggleTaskStatus(task: Task) {
+  try {
+    const newStatus = task.status === 'done' ? 'pending' : 'done'
+    await updateTask(task.id, { status: newStatus })
+    await loadTasks()
+  } catch (error) {
+    console.error('更新任务失败:', error)
+  }
+}
+
+// 删除任务
+async function deleteTask(id: number) {
+  const task = tasks.value.find(t => t.id === id)
+  if (!task) return
+
+  try {
+    await apiDeleteTask(id)
+    deletedTask.value = task
+    await loadTasks()
+
+    if (deleteTimer) clearTimeout(deleteTimer)
+    deleteTimer = setTimeout(() => {
+      deletedTask.value = null
+    }, 3000)
+  } catch (error) {
+    console.error('删除任务失败:', error)
+  }
+}
+
+// 撤销删除
+async function undoDelete() {
+  if (!deletedTask.value) return
+
+  try {
+    const data: CreateTaskRequest = {
+      title: deletedTask.value.title,
+      detail: deletedTask.value.detail,
+      task_type: deletedTask.value.task_type,
+      priority: deletedTask.value.priority,
+      due_date: deletedTask.value.due_date || dateString.value,
+      source: deletedTask.value.source
+    }
+    const task = await apiCreateTask(data)
+
+    // 恢复标签
+    if (deletedTask.value.tags) {
+      for (const tag of deletedTask.value.tags) {
+        await addTagToTask(task.id, tag.id)
+      }
+    }
+
+    deletedTask.value = null
+    if (deleteTimer) clearTimeout(deleteTimer)
+    await loadTasks()
+  } catch (error) {
+    console.error('撤销删除失败:', error)
+  }
+}
+
+// 笔记输入处理（防抖自动保存）
+function onNoteInput() {
+  saveStatus.value = 'idle'
+  if (autoSaveTimer) clearTimeout(autoSaveTimer)
+  autoSaveTimer = setTimeout(() => {
+    saveNote()
+  }, 2000)
+}
+
+// 保存笔记
+async function saveNote() {
+  if (saveStatus.value === 'saving') return
+
+  try {
+    saveStatus.value = 'saving'
+    await apiSaveNote(dateString.value, noteContent.value)
+    saveStatus.value = 'saved'
+
+    if (saveTimer) clearTimeout(saveTimer)
+    saveTimer = setTimeout(() => {
+      saveStatus.value = 'idle'
+    }, 2000)
+  } catch (error) {
+    console.error('保存笔记失败:', error)
+    saveStatus.value = 'idle'
+  }
+}
+
+// 监听日期变化
+watch(currentDate, () => {
+  loadTasks()
+  loadNote()
+})
+
+// 初始化
+onMounted(() => {
+  loadTags()
+  loadTasks()
+  loadNote()
+})
+</script>
+
+<style scoped>
+.today-view {
+  display: flex;
+  gap: var(--space-8);
+  min-height: calc(100vh - 64px - var(--space-8) * 2);
+}
+
+/* ========== 左栏：任务列表 ========== */
+.tasks-section {
+  flex: 0 0 60%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+/* 日期导航 */
+.date-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-6);
+  padding: var(--space-3) 0;
+}
+
+.nav-arrow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  border-radius: var(--radius-full);
+  transition: var(--transition-normal);
+}
+
+.nav-arrow:hover {
+  background-color: var(--bg-hover);
+}
+
+.arrow-left,
+.arrow-right {
+  display: block;
+  width: 8px;
+  height: 8px;
+  border-style: solid;
+  border-color: var(--text-secondary);
+  border-width: 0 2px 2px 0;
+  transition: var(--transition-normal);
+}
+
+.arrow-left {
+  transform: rotate(135deg);
+  margin-left: 2px;
+}
+
+.arrow-right {
+  transform: rotate(-45deg);
+  margin-right: 2px;
+}
+
+.nav-arrow:hover .arrow-left,
+.nav-arrow:hover .arrow-right {
+  border-color: var(--text-primary);
+}
+
+.date-display {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.date-text {
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-bold);
+  color: var(--text-primary);
+  letter-spacing: var(--letter-spacing-wide);
+}
+
+.weekday {
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+  letter-spacing: var(--letter-spacing-wide);
+}
+
+/* 标签筛选栏 */
+.tag-filter-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  background: var(--bg-card);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+  flex-wrap: wrap;
+}
+
+.filter-label {
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+}
+
+.filter-tags {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.filter-tag {
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  background: transparent;
+  transition: var(--transition-normal);
+}
+
+.filter-tag.all.active {
+  background: var(--accent-primary);
+  color: white;
+  border-color: var(--accent-primary);
+}
+
+/* 添加任务容器 */
+.add-task-container {
+  background: var(--bg-card);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4);
+  box-shadow: var(--shadow-card);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.tag-selection {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.selection-label {
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+}
+
+.tag-pool {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.tag-choice {
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid;
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  background: transparent;
+  transition: var(--transition-normal);
+}
+
+.tag-choice.selected {
+  color: white;
+}
+
+.create-tag-link {
+  padding: var(--space-2) var(--space-3);
+  color: var(--accent-primary);
+  text-decoration: none;
+  font-size: var(--font-size-sm);
+}
+
+.task-input-section {
+  display: flex;
+  gap: var(--space-2);
+  align-items: flex-end;
+}
+
+.task-input-section.disabled {
+  opacity: 0.5;
+}
+
+.task-input {
+  flex: 1;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-md);
+  color: var(--text-primary);
+  background: var(--bg-primary);
+  outline: none;
+}
+
+.task-input:focus {
+  border-color: var(--accent-primary);
+}
+
+.task-input:disabled {
+  background: var(--bg-secondary);
+  cursor: not-allowed;
+}
+
+.add-btn {
+  padding: var(--space-3) var(--space-4);
+  background: var(--accent-primary);
+  color: white;
+  border: none;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  font-size: var(--font-size-sm);
+  transition: var(--transition-normal);
+}
+
+.add-btn:hover:not(:disabled) {
+  background: var(--accent-secondary);
+}
+
+.add-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* 任务列表 */
+.task-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.task-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.empty-state {
+  text-align: center;
+  padding: var(--space-6);
+  color: var(--text-muted);
+  font-size: var(--font-size-sm);
+}
+
+.task-item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  background: var(--bg-card);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-card);
+  transition: var(--transition-normal);
+}
+
+.task-item:hover {
+  box-shadow: var(--shadow-hover);
+}
+
+.task-item.done {
+  opacity: 0.6;
+}
+
+.task-item.done .task-title {
+  text-decoration: line-through;
+  color: var(--text-muted);
+}
+
+.task-tags-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.task-tag {
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-xs);
+  color: white;
+}
+
+.task-main {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.checkbox {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: 2px solid var(--border);
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.checkbox:hover {
+  border-color: var(--accent-primary);
+}
+
+.checkbox.checked {
+  background: var(--accent-success);
+  border-color: var(--accent-success);
+}
+
+.check-icon {
+  display: block;
+  width: 5px;
+  height: 9px;
+  border-style: solid;
+  border-color: white;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg) translate(-1px, -1px);
+}
+
+.task-title {
+  flex: 1;
+  font-size: var(--font-size-md);
+  color: var(--text-primary);
+}
+
+.delete-btn {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--font-size-lg);
+  color: var(--text-muted);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  transition: var(--transition-normal);
+}
+
+.delete-btn:hover {
+  color: var(--accent-danger);
+  background: rgba(204, 139, 139, 0.1);
+}
+
+/* 已完成任务折叠 */
+.completed-section {
+  margin-top: var(--space-2);
+}
+
+.toggle-completed {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}
+
+.toggle-icon {
+  display: block;
+  width: 6px;
+  height: 6px;
+  border-style: solid;
+  border-color: var(--text-secondary);
+  border-width: 0 1.5px 1.5px 0;
+  transform: rotate(-45deg);
+  transition: var(--transition-normal);
+}
+
+.toggle-icon.expanded {
+  transform: rotate(45deg) translate(2px, -2px);
+}
+
+/* ========== 右栏：笔记编辑器 ========== */
+.notes-section {
+  flex: 0 0 40%;
+}
+
+.notes-card {
+  background: var(--bg-card);
+  border-radius: var(--radius-lg);
+  padding: var(--space-6);
+  box-shadow: var(--shadow-card);
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.notes-title {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-bold);
+  color: var(--text-primary);
+  margin-bottom: var(--space-4);
+}
+
+.notes-textarea {
+  flex: 1;
+  width: 100%;
+  min-height: 400px;
+  padding: var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-md);
+  color: var(--text-primary);
+  background: var(--bg-primary);
+  resize: none;
+  outline: none;
+}
+
+.notes-textarea:focus {
+  border-color: var(--accent-primary);
+}
+
+.save-status {
+  height: 20px;
+  margin-top: var(--space-3);
+  text-align: right;
+}
+
+.status-saving,
+.status-saved {
+  font-size: var(--font-size-xs);
+}
+
+.status-saving {
+  color: var(--text-secondary);
+}
+
+.status-saved {
+  color: var(--accent-success);
+}
+
+/* ========== Undo Toast ========== */
+.undo-toast {
+  position: fixed;
+  bottom: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-3) var(--space-5);
+  background: var(--text-primary);
+  color: white;
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+  z-index: var(--z-toast);
+}
+
+.undo-btn {
+  padding: var(--space-1) var(--space-3);
+  font-size: var(--font-size-xs);
+  color: var(--accent-primary);
+  background: transparent;
+  border: 1px solid var(--accent-primary);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.undo-btn:hover {
+  background: var(--accent-primary);
+  color: white;
+}
+
+/* Toast 动画 */
+.toast-enter-active,
+.toast-leave-active {
+  transition: all 0.3s ease;
+}
+
+.toast-enter-from,
+.toast-leave-to {
+  opacity: 0;
+  transform: translateX(-50%) translateY(20px);
+}
+
+/* ========== 响应式适配 ========== */
+@media (max-width: 768px) {
+  .today-view {
+    flex-direction: column;
+    gap: var(--space-5);
+  }
+
+  .tasks-section,
+  .notes-section {
+    flex: 1;
+    width: 100%;
+  }
+
+  .notes-card {
+    min-height: 300px;
+  }
+
+  .task-input-section {
+    flex-direction: column;
+  }
+
+  .add-btn {
+    width: 100%;
+  }
+}
+</style>
