@@ -6,6 +6,7 @@ import StatsView from '../views/StatsView.vue'
 import SettingsView from '../views/SettingsView.vue'
 import LinksView from '../views/LinksView.vue'
 import LoginView from '../views/LoginView.vue'
+import PoeticWriting from '../views/PoeticWriting.vue'
 
 // 角色专属页面
 import MakeupDashboard from '../views/roles/MakeupDashboard.vue'
@@ -331,12 +332,24 @@ const routes = [
 
   // 登录路由
   {
+{
     path: '/login',
     name: 'Login',
     component: LoginView,
     meta: {
       title: '登录',
-      public: true  // 公开路由，不需要登录
+      public: true
+    }
+  },
+  {
+    path: '/write',
+    name: 'PoeticWriting',
+    component: PoeticWriting,
+    meta: {
+      title: '诗意写作',
+      roles: ['default']
+    }
+  },// 公开路由，不需要登录
     }
   }
 ]
