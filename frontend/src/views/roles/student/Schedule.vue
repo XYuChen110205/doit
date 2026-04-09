@@ -1223,26 +1223,81 @@ async function exportAsImage() {
     // 获取内容实际高度
     const contentHeight = exportContainer.value.scrollHeight
 
-    const canvas = await html2canvas(exportContainer.value, {
-      scale: exportScale.value,
-      useCORS: true,
-      allowTaint: true,
-      backgroundColor: null,
-      logging: false,
-      width: 1400,
-      height: contentHeight,
-      windowWidth: 1400,
-      windowHeight: contentHeight
-    })
+    // 关键修复：html2canvas 不支持 background-attachment: fixed
+    // 需要在导出时临时改为 scroll 模式，并设置正确的背景尺寸
+    if (exportWithBg.value && background.value) {
+      // 保存原始样式
+      const originalBgAttachment = exportContainer.value.style.backgroundAttachment
+      const originalBgSize = exportContainer.value.style.backgroundSize
+      const originalBgPosition = exportContainer.value.style.backgroundPosition
+      const originalBgRepeat = exportContainer.value.style.backgroundRepeat
+      
+      // 临时修改为 scroll 模式，确保背景能正确渲染
+      exportContainer.value.style.backgroundAttachment = 'scroll'
+      // 使用 cover 确保背景覆盖整个内容区域
+      exportContainer.value.style.backgroundSize = 'cover'
+      exportContainer.value.style.backgroundPosition = 'center top'
+      exportContainer.value.style.backgroundRepeat = 'no-repeat'
+      
+      const canvas = await html2canvas(exportContainer.value, {
+        scale: exportScale.value,
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: null,
+        logging: false,
+        width: 1400,
+        height: contentHeight,
+        windowWidth: 1400,
+        windowHeight: contentHeight,
+        onclone: (clonedDoc) => {
+          // 在克隆的文档中也确保背景样式正确
+          const clonedContainer = clonedDoc.querySelector('.export-container') as HTMLElement
+          if (clonedContainer) {
+            clonedContainer.style.backgroundAttachment = 'scroll'
+            clonedContainer.style.backgroundSize = 'cover'
+            clonedContainer.style.backgroundPosition = 'center top'
+            clonedContainer.style.backgroundRepeat = 'no-repeat'
+          }
+        }
+      })
+      
+      // 恢复原始样式
+      exportContainer.value.style.backgroundAttachment = originalBgAttachment
+      exportContainer.value.style.backgroundSize = originalBgSize
+      exportContainer.value.style.backgroundPosition = originalBgPosition
+      exportContainer.value.style.backgroundRepeat = originalBgRepeat
 
-    // 隐藏导出容器
-    exportContainer.value.style.display = 'none'
-    exportContainer.value.style.visibility = 'hidden'
+      // 隐藏导出容器
+      exportContainer.value.style.display = 'none'
+      exportContainer.value.style.visibility = 'hidden'
 
-    const link = document.createElement('a')
-    link.download = `课程表_${currentTerm.value}_第${currentWeek.value}周.${exportFormat.value}`
-    link.href = canvas.toDataURL(`image/${exportFormat.value}`, exportQuality.value)
-    link.click()
+      const link = document.createElement('a')
+      link.download = `课程表_${currentTerm.value}_第${currentWeek.value}周.${exportFormat.value}`
+      link.href = canvas.toDataURL(`image/${exportFormat.value}`, exportQuality.value)
+      link.click()
+    } else {
+      // 没有背景图片的情况
+      const canvas = await html2canvas(exportContainer.value, {
+        scale: exportScale.value,
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: null,
+        logging: false,
+        width: 1400,
+        height: contentHeight,
+        windowWidth: 1400,
+        windowHeight: contentHeight
+      })
+
+      // 隐藏导出容器
+      exportContainer.value.style.display = 'none'
+      exportContainer.value.style.visibility = 'hidden'
+
+      const link = document.createElement('a')
+      link.download = `课程表_${currentTerm.value}_第${currentWeek.value}周.${exportFormat.value}`
+      link.href = canvas.toDataURL(`image/${exportFormat.value}`, exportQuality.value)
+      link.click()
+    }
 
     closeExportModal()
   } catch (error) {

@@ -142,7 +142,7 @@ interface Project {
 }
 
 // 内置开源项目数据
-const projects: Project[] = [
+const builtInProjects: Project[] = [
   {
     id: 1,
     name: 'Digital Twin Platform',
