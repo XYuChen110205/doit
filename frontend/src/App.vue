@@ -1,9 +1,12 @@
 <template>
   <div class="app">
-    <!-- 顶部导航栏 - 毛玻璃效果 -->
+    <!-- 顶部导航栏 - 精致毛玻璃效果 -->
     <nav class="navbar">
       <div class="nav-container">
-        <div class="nav-brand">{{ currentRoleInfo.name }}</div>
+        <div class="nav-brand">
+          <span class="brand-icon">✦</span>
+          <span class="brand-text">{{ currentRoleInfo.name }}</span>
+        </div>
         <div class="nav-links">
           <router-link
             v-for="route in currentRoutes"
@@ -25,7 +28,7 @@
       </div>
     </main>
 
-    <!-- 移动端底部导航栏 - 毛玻璃效果 -->
+    <!-- 移动端底部导航栏 -->
     <nav class="navbar-mobile">
       <router-link
         v-for="route in currentRoutes"
@@ -52,7 +55,7 @@ const currentRole = ref('default')
 
 // 角色信息
 const roleInfo: Record<string, { name: string; icon: string }> = {
-  default: { name: 'Todo', icon: '📋' },
+  default: { name: 'Do It', icon: '✦' },
   makeup: { name: '化妆师助手', icon: '💄' },
   student: { name: '学习助手', icon: '📚' },
   study: { name: '专注自习', icon: '🧘' },
@@ -106,19 +109,19 @@ onMounted(() => {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  background-color: var(--bg-primary);
+  background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
 }
 
-/* ========== 顶部导航栏 - 毛玻璃效果 ========== */
+/* ========== 顶部导航栏 - 精致毛玻璃效果 ========== */
 .navbar {
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
   z-index: var(--z-nav);
-  background-color: var(--bg-nav);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  background: var(--bg-nav);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
   border-bottom: 1px solid var(--border-light);
   box-shadow: var(--shadow-nav);
 }
@@ -127,70 +130,71 @@ onMounted(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  max-width: 1200px;
+  max-width: 1400px;
   margin: 0 auto;
   padding: 0 var(--space-8);
-  height: 64px;
+  height: 72px;
 }
 
 .nav-brand {
-  font-size: 18px;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  font-size: var(--font-size-xl);
   font-weight: var(--font-weight-bold);
   color: var(--text-primary);
-  letter-spacing: var(--letter-spacing-wide);
+  letter-spacing: var(--letter-spacing-tight);
+}
+
+.brand-icon {
+  font-size: var(--font-size-lg);
+  color: var(--accent-primary);
+}
+
+.brand-text {
+  background: linear-gradient(135deg, var(--text-primary) 0%, var(--accent-primary) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
 .nav-links {
   display: flex;
-  gap: var(--space-8);
+  gap: var(--space-2);
 }
 
 .nav-link {
   position: relative;
-  padding: var(--space-2) 0;
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-regular);
-  letter-spacing: var(--letter-spacing-wide);
+  padding: var(--space-3) var(--space-5);
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-medium);
+  letter-spacing: var(--letter-spacing-normal);
   color: var(--text-secondary);
   text-decoration: none;
-  transition: var(--transition-normal);
-}
-
-.nav-link::after {
-  content: '';
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 2px;
-  background-color: var(--accent-primary);
-  transform: scaleX(0);
+  border-radius: var(--radius-md);
   transition: var(--transition-normal);
 }
 
 .nav-link:hover {
   color: var(--text-primary);
+  background: var(--bg-hover);
 }
 
 .nav-link.active {
   color: var(--accent-primary);
-  font-weight: var(--font-weight-medium);
-}
-
-.nav-link.active::after {
-  transform: scaleX(1);
+  background: var(--accent-primary-light);
 }
 
 /* ========== 主内容区 ========== */
 .main-content {
   flex: 1;
-  margin-top: 64px;
+  margin-top: 72px;
   padding: var(--space-8);
   overflow: auto;
 }
 
 .content-wrapper {
-  max-width: 1200px;
+  max-width: 1400px;
   margin: 0 auto;
 }
 
@@ -202,11 +206,11 @@ onMounted(() => {
   left: 0;
   right: 0;
   z-index: var(--z-nav);
-  background-color: var(--bg-nav);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  background: var(--bg-nav);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
   border-top: 1px solid var(--border-light);
-  box-shadow: 0 -1px 8px rgba(123, 175, 204, 0.1);
+  box-shadow: 0 -2px 12px rgba(26, 43, 60, 0.08);
   padding: var(--space-2) 0 calc(var(--space-2) + env(safe-area-inset-bottom));
 }
 
@@ -217,9 +221,9 @@ onMounted(() => {
   align-items: center;
   justify-content: center;
   padding: var(--space-2) var(--space-1);
-  font-size: 11px;
-  font-weight: var(--font-weight-regular);
-  letter-spacing: var(--letter-spacing-wide);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  letter-spacing: var(--letter-spacing-normal);
   color: var(--text-secondary);
   text-decoration: none;
   transition: var(--transition-normal);
@@ -232,15 +236,15 @@ onMounted(() => {
   top: 0;
   left: 50%;
   transform: translateX(-50%) scaleX(0);
-  width: 24px;
-  height: 2px;
-  background-color: var(--accent-primary);
+  width: 32px;
+  height: 3px;
+  background: var(--accent-primary);
+  border-radius: var(--radius-full);
   transition: var(--transition-normal);
 }
 
 .nav-link-mobile.active {
   color: var(--accent-primary);
-  font-weight: var(--font-weight-medium);
 }
 
 .nav-link-mobile.active::before {
@@ -260,7 +264,7 @@ onMounted(() => {
 
   .main-content {
     margin-top: 0;
-    margin-bottom: 56px;
+    margin-bottom: 64px;
     padding: var(--space-5);
   }
 
