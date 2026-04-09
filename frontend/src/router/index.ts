@@ -4,6 +4,7 @@ import InboxView from '../views/InboxView.vue'
 import CalendarView from '../views/CalendarView.vue'
 import StatsView from '../views/StatsView.vue'
 import SettingsView from '../views/SettingsView.vue'
+import LinksView from '../views/LinksView.vue'
 
 // 角色专属页面
 import MakeupDashboard from '../views/roles/MakeupDashboard.vue'
@@ -39,6 +40,15 @@ const routes = [
     component: CalendarView,
     meta: {
       title: '日历',
+      roles: ['default']
+    }
+  },
+  {
+    path: '/links',
+    name: 'Links',
+    component: LinksView,
+    meta: {
+      title: '链接库',
       roles: ['default']
     }
   },
