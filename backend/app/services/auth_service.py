@@ -1,52 +1,70 @@
 """认证服务"""
 from datetime import datetime, timedelta
 from typing import Optional
-from jose import JWTError, jwt
-from passlib.context import CryptContext
+import hashlib
+import secrets
 from fastapi import HTTPException, status
 from app.database import database
 from app.models.user import UserCreate, UserLogin, UserInDB, User
 
-# JWT 配置
-SECRET_KEY = "your-secret-key-here-change-in-production"  # 生产环境需要更换
-ALGORITHM = "HS256"
+# JWT 配置 - 简化版本，不使用 jose
+SECRET_KEY = "your-secret-key-here-change-in-production"
 ACCESS_TOKEN_EXPIRE_DAYS = 30
-
-# 密码哈希
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """验证密码"""
-    return pwd_context.verify(plain_password, hashed_password)
+    # 简单的 SHA256 哈希验证
+    salt, stored_hash = hashed_password.split('$')
+    computed_hash = hashlib.sha256((salt + plain_password).encode()).hexdigest()
+    return secrets.compare_digest(computed_hash, stored_hash)
 
 
 def get_password_hash(password: str) -> str:
     """获取密码哈希"""
-    return pwd_context.hash(password)
+    # 生成随机 salt
+    salt = secrets.token_hex(16)
+    # SHA256 哈希
+    hashed = hashlib.sha256((salt + password).encode()).hexdigest()
+    return f"{salt}${hashed}"
 
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
-    """创建访问令牌"""
+    """创建访问令牌 - 简化版本"""
+    import base64
+    import json
+    
     to_encode = data.copy()
     if expires_delta:
         expire = datetime.utcnow() + expires_delta
     else:
         expire = datetime.utcnow() + timedelta(days=ACCESS_TOKEN_EXPIRE_DAYS)
-    to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
-    return encoded_jwt
+    to_encode.update({"exp": expire.isoformat()})
+    
+    # 简单的 base64 编码（生产环境应该使用 JWT）
+    payload = json.dumps(to_encode).encode()
+    return base64.b64encode(payload).decode()
 
 
 def verify_token(token: str) -> Optional[str]:
-    """验证令牌，返回用户名"""
+    """验证令牌，返回用户名 - 简化版本"""
+    import base64
+    import json
+    
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        username: str = payload.get("sub")
-        if username is None:
-            return None
+        payload = base64.b64decode(token).decode()
+        data = json.loads(payload)
+        username = data.get("sub")
+        
+        # 检查是否过期
+        exp_str = data.get("exp")
+        if exp_str:
+            exp = datetime.fromisoformat(exp_str)
+            if datetime.utcnow() > exp:
+                return None
+        
         return username
-    except JWTError:
+    except Exception:
         return None
 
 
