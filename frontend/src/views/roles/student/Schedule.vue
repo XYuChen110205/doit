@@ -2464,23 +2464,139 @@ onUnmounted(() => {
   font-weight: 500;
 }
 
-/* 响应式 */
+/* 响应式 - 移动端优化 */
 @media (max-width: 768px) {
+  .student-schedule {
+    padding: var(--space-2);
+  }
+
   .schedule-wrapper {
-    overflow-x: scroll;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    max-height: calc(100vh - 200px);
   }
 
   .schedule-table {
-    min-width: 800px;
+    min-width: 600px;
   }
 
+  /* 表头缩小 */
+  .table-header {
+    grid-template-columns: 60px repeat(5, 1fr);
+  }
+
+  .time-header,
+  .day-header {
+    padding: var(--space-2);
+  }
+
+  .day-name {
+    font-size: var(--font-size-sm);
+  }
+
+  .day-date {
+    font-size: var(--font-size-xs);
+  }
+
+  /* 时间段缩小 */
+  .table-row {
+    grid-template-columns: 60px repeat(5, 1fr);
+  }
+
+  .time-cell {
+    padding: var(--space-1);
+  }
+
+  .period-name {
+    font-size: var(--font-size-xs);
+  }
+
+  .period-time {
+    font-size: 10px;
+  }
+
+  /* 课程块缩小 */
+  .course-cell {
+    min-height: 60px;
+    padding: 2px;
+  }
+
+  .course-block {
+    padding: var(--space-1);
+    min-height: 56px;
+  }
+
+  .course-name {
+    font-size: 11px;
+  }
+
+  .course-code,
+  .course-weeks,
+  .course-room {
+    font-size: 9px;
+  }
+
+  /* 页面头部 */
   .page-header {
     flex-direction: column;
     align-items: stretch;
+    gap: var(--space-3);
+    margin-bottom: var(--space-3);
+  }
+
+  .page-header h1 {
+    font-size: var(--font-size-xl);
+    text-align: center;
   }
 
   .header-controls {
+    flex-wrap: wrap;
     justify-content: center;
+    gap: var(--space-2);
+  }
+
+  .header-controls button,
+  .header-controls select {
+    padding: var(--space-2);
+    font-size: var(--font-size-sm);
+  }
+
+  /* 周导航 */
+  .week-nav {
+    order: -1;
+    width: 100%;
+    justify-content: center;
+  }
+
+  .week-title {
+    font-size: var(--font-size-base);
+  }
+
+  /* 通知栏 */
+  .notification-bar {
+    flex-wrap: wrap;
+    font-size: var(--font-size-xs);
+    padding: var(--space-2);
+  }
+
+  /* 复制提示 */
+  .copy-hint {
+    flex-wrap: wrap;
+    font-size: var(--font-size-xs);
+    padding: var(--space-2);
+  }
+
+  .hint-detail {
+    width: 100%;
+    margin-left: 0;
+    margin-top: var(--space-1);
+  }
+
+  /* 弹窗适配 */
+  .modal {
+    padding: var(--space-4);
+    margin: var(--space-2);
+    max-height: 95vh;
   }
 
   .form-row {
@@ -2496,11 +2612,54 @@ onUnmounted(() => {
   }
 
   .export-options {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: 1fr;
   }
 
-  .export-modal {
+  .export-modal-simple {
     width: 95%;
+    padding: var(--space-4);
+  }
+
+  /* 午休行 */
+  .break-row {
+    padding: var(--space-1);
+  }
+
+  .break-label {
+    font-size: var(--font-size-xs);
+  }
+
+  /* 节次标题 */
+  .section-header {
+    padding: var(--space-1);
+    font-size: var(--font-size-xs);
+  }
+}
+
+/* 超小屏幕 */
+@media (max-width: 480px) {
+  .schedule-table {
+    min-width: 500px;
+  }
+
+  .table-header {
+    grid-template-columns: 50px repeat(5, 1fr);
+  }
+
+  .table-row {
+    grid-template-columns: 50px repeat(5, 1fr);
+  }
+
+  .course-cell {
+    min-height: 50px;
+  }
+
+  .course-block {
+    min-height: 46px;
+  }
+
+  .course-name {
+    font-size: 10px;
   }
 }
 </style>
