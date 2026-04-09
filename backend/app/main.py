@@ -25,15 +25,8 @@ async def lifespan(app: FastAPI):
     await database.disconnect()
 
 
-# 检测是否在 Vercel 环境
-is_vercel = os.environ.get('VERCEL') == '1'
-
-if is_vercel:
-    # Vercel 环境：简化初始化
-    app = FastAPI(title="Todo System API")
-else:
-    # 本地/Railway 环境：正常使用 lifespan
-    app = FastAPI(title="Todo System API", lifespan=lifespan)
+# 创建 FastAPI 应用（所有环境都使用 lifespan）
+app = FastAPI(title="Todo System API", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
