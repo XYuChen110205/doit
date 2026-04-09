@@ -7,16 +7,20 @@
           <span class="brand-icon">✦</span>
           <span class="brand-text">{{ currentRoleInfo.name }}</span>
         </div>
-        <div class="nav-links">
-          <router-link
-            v-for="route in currentRoutes"
-            :key="route.path"
-            :to="route.path"
-            class="nav-link"
-            :class="{ active: $route.path === route.path }"
-          >
-            {{ route.meta?.title }}
-          </router-link>
+        <div class="nav-right">
+          <div class="nav-links">
+            <router-link
+              v-for="route in currentRoutes"
+              :key="route.path"
+              :to="route.path"
+              class="nav-link"
+              :class="{ active: $route.path === route.path }"
+            >
+              {{ route.meta?.title }}
+            </router-link>
+          </div>
+          <!-- 主题切换按钮 -->
+          <ThemeSwitcher />
         </div>
       </div>
     </nav>
@@ -47,6 +51,8 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import router from './router'
+import ThemeSwitcher from './components/ThemeSwitcher.vue'
+import { initTheme } from './styles/themes'
 
 const $route = useRoute()
 
@@ -96,6 +102,7 @@ function loadRole() {
 // 初始化
 onMounted(() => {
   loadRole()
+  initTheme() // 初始化主题
 })
 </script>
 
@@ -156,6 +163,12 @@ onMounted(() => {
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
+}
+
+.nav-right {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
 }
 
 .nav-links {
