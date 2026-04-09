@@ -1,7 +1,7 @@
 """FastAPI 应用入口"""
 import os
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from app.database import database, create_tables
 from app.response import success
@@ -15,6 +15,8 @@ from app.routers.task_tags import router as task_tags_router
 from app.routers.courses import router as courses_router
 from app.routers.auth import router as auth_router
 
+# 检测是否在 Vercel 环境
+is_vercel = os.environ.get('VERCEL') == '1'
 
 
 @asynccontextmanager
@@ -25,8 +27,13 @@ async def lifespan(app: FastAPI):
     await database.disconnect()
 
 
-# 创建 FastAPI 应用（所有环境都使用 lifespan）
-app = FastAPI(title="Todo System API", lifespan=lifespan)
+# 创建 FastAPI 应用
+if is_vercel:
+    # Vercel 环境：不使用 lifespan，手动处理数据库连接
+    app = FastAPI(title="Todo System API")
+else:
+    # 本地环境：正常使用 lifespan
+    app = FastAPI(title="Todo System API", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -35,6 +42,16 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Vercel 环境：使用中间件管理数据库连接
+if is_vercel:
+    @app.middleware("http")
+    async def db_connection_middleware(request: Request, call_next):
+        # 确保数据库已连接
+        if not database.is_connected:
+            await database.connect()
+        response = await call_next(request)
+        return response
 
 app.include_router(tasks_router)
 app.include_router(notes_router)
