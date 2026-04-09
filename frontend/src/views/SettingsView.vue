@@ -4,6 +4,11 @@
       <!-- 标题 -->
       <h1 class="settings-title">设置</h1>
 
+      <!-- 字体设置 -->
+      <div class="settings-section">
+        <FontSelector />
+      </div>
+
       <!-- 角色选择 -->
       <div class="settings-section">
         <h2 class="section-title">角色模式</h2>
@@ -75,6 +80,7 @@ import { ref, onMounted } from 'vue'
 import type { Tag } from '../types'
 import { listTags, createTag, deleteTag } from '../api/tags'
 import { exportData as exportDataApi } from '../api/settings'
+import FontSelector from '../components/FontSelector.vue'
 
 // 角色列表
 const roles = [
