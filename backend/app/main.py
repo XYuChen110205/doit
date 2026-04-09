@@ -13,6 +13,7 @@ from app.routers.tags import router as tags_router
 from app.routers.settings import router as settings_router
 from app.routers.task_tags import router as task_tags_router
 from app.routers.courses import router as courses_router
+from app.routers.auth import router as auth_router
 
 
 
@@ -50,6 +51,7 @@ app.include_router(tags_router)
 app.include_router(settings_router)
 app.include_router(task_tags_router)
 app.include_router(courses_router)
+app.include_router(auth_router)
 
 
 @app.get("/api/health")

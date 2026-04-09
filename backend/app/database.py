@@ -112,6 +112,18 @@ schedule_settings = sqlalchemy.Table(
     sqlalchemy.Column("updated_at", sqlalchemy.String(19)),
 )
 
+# ---- 用户表 ----
+users = sqlalchemy.Table(
+    "users", metadata,
+    sqlalchemy.Column("id", sqlalchemy.Integer, primary_key=True, autoincrement=True),
+    sqlalchemy.Column("username", sqlalchemy.String(50), unique=True, nullable=False),
+    sqlalchemy.Column("email", sqlalchemy.String(100), unique=True, nullable=False),
+    sqlalchemy.Column("hashed_password", sqlalchemy.String(255), nullable=False),
+    sqlalchemy.Column("avatar", sqlalchemy.String(500), default=None),
+    sqlalchemy.Column("created_at", sqlalchemy.DateTime, default=sqlalchemy.func.now()),
+    sqlalchemy.Column("updated_at", sqlalchemy.DateTime, default=None),
+)
+
 
 def create_tables():
     engine = sqlalchemy.create_engine(DATABASE_URL)
