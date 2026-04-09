@@ -21,6 +21,12 @@
           </div>
           <!-- 主题切换按钮 -->
           <ThemeSwitcher />
+          <!-- 用户信息 -->
+          <div v-if="userStore.isLoggedIn" class="user-menu">
+            <span class="username">{{ userStore.username }}</span>
+            <button class="logout-btn" @click="handleLogout">退出</button>
+          </div>
+          <router-link v-else to="/login" class="login-link">登录</router-link>
         </div>
       </div>
     </nav>
@@ -49,12 +55,15 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import router from './router'
 import ThemeSwitcher from './components/ThemeSwitcher.vue'
 import { initTheme } from './styles/themes'
+import { useUserStore } from './stores/user'
 
 const $route = useRoute()
+const $router = useRouter()
+const userStore = useUserStore()
 
 // 当前角色
 const currentRole = ref('default')
@@ -103,7 +112,14 @@ function loadRole() {
 onMounted(() => {
   loadRole()
   initTheme() // 初始化主题
+  userStore.init() // 初始化用户状态
 })
+
+// 退出登录
+function handleLogout() {
+  userStore.logout()
+  $router.push('/login')
+}
 </script>
 
 <style>
@@ -196,6 +212,52 @@ onMounted(() => {
 .nav-link.active {
   color: var(--accent-primary);
   background: var(--accent-primary-light);
+}
+
+/* 用户菜单 */
+.user-menu {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding-left: var(--space-4);
+  border-left: 1px solid var(--border-light);
+}
+
+.username {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-secondary);
+}
+
+.logout-btn {
+  padding: var(--space-2) var(--space-3);
+  background: var(--bg-secondary);
+  border: none;
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: var(--transition-normal);
+}
+
+.logout-btn:hover {
+  background: var(--accent-danger);
+  color: white;
+}
+
+.login-link {
+  padding: var(--space-2) var(--space-4);
+  background: var(--accent-primary);
+  color: white;
+  text-decoration: none;
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  transition: var(--transition-normal);
+}
+
+.login-link:hover {
+  background: var(--accent-primary-hover);
 }
 
 /* ========== 主内容区 ========== */

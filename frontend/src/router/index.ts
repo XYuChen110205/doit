@@ -5,6 +5,7 @@ import CalendarView from '../views/CalendarView.vue'
 import StatsView from '../views/StatsView.vue'
 import SettingsView from '../views/SettingsView.vue'
 import LinksView from '../views/LinksView.vue'
+import LoginView from '../views/LoginView.vue'
 
 // 角色专属页面
 import MakeupDashboard from '../views/roles/MakeupDashboard.vue'
@@ -317,12 +318,43 @@ const routes = [
       title: '设置',
       roles: ['default', 'makeup', 'student', 'study', 'manager', 'cs_student', 'custom']
     }
+  },
+
+  // 登录路由
+  {
+    path: '/login',
+    name: 'Login',
+    component: LoginView,
+    meta: {
+      title: '登录',
+      public: true  // 公开路由，不需要登录
+    }
   }
 ]
 
 const router = createRouter({
   history: createWebHistory(),
   routes
+})
+
+// 路由守卫 - 检查登录状态
+router.beforeEach((to, from, next) => {
+  const token = localStorage.getItem('token')
+  const isLoggedIn = !!token
+
+  // 如果访问登录页且已登录，跳转到首页
+  if (to.path === '/login' && isLoggedIn) {
+    next('/')
+    return
+  }
+
+  // 如果需要登录但未登录，跳转到登录页
+  if (!to.meta.public && !isLoggedIn) {
+    next('/login')
+    return
+  }
+
+  next()
 })
 
 export default router
