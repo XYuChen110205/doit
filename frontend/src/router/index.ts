@@ -333,7 +333,6 @@ const routes = [
 
   // 登录路由
   {
-{
     path: '/login',
     name: 'Login',
     component: LoginView,
@@ -358,8 +357,6 @@ const routes = [
     meta: {
       title: '今日手账',
       roles: ['default']
-    }
-  },// 公开路由，不需要登录
     }
   }
 ]
