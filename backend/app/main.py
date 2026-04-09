@@ -18,6 +18,9 @@ from app.routers.auth import router as auth_router
 # 检测是否在 Vercel 环境
 is_vercel = os.environ.get('VERCEL') == '1'
 
+print(f"[Main] VERCEL env: {os.environ.get('VERCEL')}")
+print(f"[Main] is_vercel: {is_vercel}")
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -63,7 +66,12 @@ app.include_router(task_tags_router)
 app.include_router(courses_router)
 app.include_router(auth_router)
 
+print(f"[Main] Routers loaded: auth, tasks, notes, inbox, stats, tags, settings, courses")
 
 @app.get("/api/health")
 async def health_check():
     return success(data={"status": "running"})
+
+@app.get("/")
+async def root():
+    return success(data={"message": "Todo API is running", "docs": "/docs"})
