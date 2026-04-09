@@ -459,126 +459,6 @@
         </div>
       </div>
     </div>
-
-    <!-- 隐藏的导出容器 - 用于生成与网页显示一致的图片 -->
-    <div 
-      v-show="false" 
-      ref="exportContainer" 
-      class="export-container"
-      :style="exportContainerStyle"
-    >
-      <div class="export-content" :style="exportContentStyle">
-        <!-- 复制课表内容 -->
-        <div class="export-table-wrapper" :style="exportTableWrapperStyle">
-          <!-- 表头 -->
-          <div class="export-table-header">
-            <div class="export-time-header">时间</div>
-            <div
-              v-for="day in weekDays"
-              :key="day.value"
-              class="export-day-header"
-              :class="{ today: isToday(day.value) }"
-            >
-              <div class="export-day-name">{{ day.name }}</div>
-            </div>
-          </div>
-
-          <!-- 上午 -->
-          <div class="export-section-header">上午</div>
-          <div 
-            v-for="period in morningPeriods" 
-            :key="period.index"
-            class="export-table-row"
-          >
-            <div class="export-time-cell">
-              <div class="export-period-name">第{{ period.index }}节</div>
-              <div class="export-period-time">{{ period.time }}</div>
-            </div>
-            <div
-              v-for="day in weekDays"
-              :key="day.value"
-              class="export-course-cell"
-              :class="{ 'has-course': getCourse(day.value, period.index) }"
-            >
-              <div 
-                v-if="getCourse(day.value, period.index)"
-                class="export-course-block"
-                :style="{ backgroundColor: getCourseColor(getCourse(day.value, period.index)!) }"
-              >
-                <div class="export-course-name">{{ getCourse(day.value, period.index)?.name }}</div>
-                <div class="export-course-room">{{ getCourse(day.value, period.index)?.room }}</div>
-              </div>
-            </div>
-          </div>
-
-          <!-- 午休 -->
-          <div class="export-break-row">
-            <div class="export-break-label">午餐、午休</div>
-          </div>
-
-          <!-- 下午 -->
-          <div class="export-section-header">下午</div>
-          <div 
-            v-for="period in afternoonPeriods" 
-            :key="period.index"
-            class="export-table-row"
-          >
-            <div class="export-time-cell">
-              <div class="export-period-name">第{{ period.index }}节</div>
-              <div class="export-period-time">{{ period.time }}</div>
-            </div>
-            <div
-              v-for="day in weekDays"
-              :key="day.value"
-              class="export-course-cell"
-              :class="{ 'has-course': getCourse(day.value, period.index) }"
-            >
-              <div
-                v-if="getCourse(day.value, period.index)"
-                class="export-course-block"
-                :style="{ backgroundColor: getCourseColor(getCourse(day.value, period.index)!) }"
-              >
-                <div class="export-course-name">{{ getCourse(day.value, period.index)?.name }}</div>
-                <div class="export-course-room">{{ getCourse(day.value, period.index)?.room }}</div>
-              </div>
-            </div>
-          </div>
-
-          <!-- 晚餐 -->
-          <div class="export-break-row dinner">
-            <div class="export-break-label">晚餐</div>
-          </div>
-
-          <!-- 晚上 -->
-          <div class="export-section-header">晚上</div>
-          <div 
-            v-for="period in eveningPeriods" 
-            :key="period.index"
-            class="export-table-row"
-          >
-            <div class="export-time-cell">
-              <div class="export-period-name">第{{ period.index }}节</div>
-              <div class="export-period-time">{{ period.time }}</div>
-            </div>
-            <div
-              v-for="day in weekDays"
-              :key="day.value"
-              class="export-course-cell"
-              :class="{ 'has-course': getCourse(day.value, period.index) }"
-            >
-              <div
-                v-if="getCourse(day.value, period.index)"
-                class="export-course-block"
-                :style="{ backgroundColor: getCourseColor(getCourse(day.value, period.index)!) }"
-              >
-                <div class="export-course-name">{{ getCourse(day.value, period.index)?.name }}</div>
-                <div class="export-course-room">{{ getCourse(day.value, period.index)?.room }}</div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
   </div>
 </template>
 
@@ -724,60 +604,6 @@ const exportScale = ref(2)
 const exportWithBg = ref(true)
 const scheduleWrapper = ref<HTMLElement | null>(null)
 const scheduleTable = ref<HTMLElement | null>(null)
-const exportContainer = ref<HTMLElement | null>(null)
-
-// 导出容器样式 - 模拟网页上的 fixed 背景效果
-const exportContainerStyle = computed(() => {
-  if (!exportWithBg.value || !background.value) {
-    return {
-      background: '#ffffff'
-    }
-  }
-  
-  const opacity = backgroundOpacity.value
-  if (background.value.startsWith('http') || background.value.startsWith('data:')) {
-    // 图片背景：使用用户设置的缩放和位置，但改用 scroll 模式
-    return {
-      backgroundImage: `linear-gradient(rgba(255,255,255,${1-opacity}), rgba(255,255,255,${1-opacity})), url(${background.value})`,
-      backgroundSize: `${bgScale.value}%`,
-      backgroundPosition: `${bgPosition.value.x}% ${bgPosition.value.y}%`,
-      backgroundRepeat: 'no-repeat',
-      backgroundAttachment: 'scroll'
-    }
-  }
-  // 渐变色背景
-  return {
-    background: background.value
-  }
-})
-
-// 导出内容样式
-const exportContentStyle = computed(() => {
-  return {
-    padding: '30px',
-    minHeight: '100%'
-  }
-})
-
-// 导出课表包装样式
-const exportTableWrapperStyle = computed(() => {
-  return {
-    background: `rgba(255, 255, 255, ${tableOpacity.value})`,
-    borderRadius: '12px',
-    padding: '20px',
-    boxShadow: '0 4px 20px rgba(0, 0, 0, 0.1)'
-  }
-})
-
-// 导出课表样式（课表透明度）
-const exportTableStyle = computed(() => {
-  return {
-    backgroundColor: `rgba(255, 255, 255, ${tableOpacity.value})`,
-    borderRadius: '12px',
-    padding: '20px',
-    backdropFilter: tableOpacity.value < 1 ? 'blur(10px)' : 'none'
-  }
-})
 
 // 复制粘贴功能
 const copiedCourse = ref<Course | null>(null)
@@ -1192,112 +1018,98 @@ function closeExportModal() {
   showExportModal.value = false
 }
 
-// 使用html2canvas导出图片
+// 使用html2canvas导出图片 - 直接捕获页面上显示的课表
 async function exportAsImage() {
-  if (!exportContainer.value) return
+  if (!scheduleWrapper.value) return
 
   try {
-    // 动态导入html2canvas
     const html2canvas = (await import('html2canvas')).default
 
-    // 临时显示导出容器以便捕获
-    exportContainer.value.style.position = 'absolute'
-    exportContainer.value.style.left = '-9999px'
-    exportContainer.value.style.top = '0'
-    exportContainer.value.style.visibility = 'visible'
-    exportContainer.value.style.display = 'block'
-    exportContainer.value.style.width = '1400px' // 固定宽度确保一致性
-
-    // 等待图片加载完成
+    // 等待图片加载完成（如果有背景图片）
     if (background.value && (background.value.startsWith('http') || background.value.startsWith('data:'))) {
       const img = new Image()
       img.crossOrigin = 'anonymous'
       img.src = background.value
       await new Promise((resolve) => {
         img.onload = resolve
-        img.onerror = resolve // 即使加载失败也继续
-        setTimeout(resolve, 1000) // 最多等待1秒
+        img.onerror = resolve
+        setTimeout(resolve, 500)
       })
     }
 
-    // 获取内容实际高度
-    const contentHeight = exportContainer.value.scrollHeight
+    // 保存原始样式
+    const originalStyles = {
+      maxHeight: scheduleWrapper.value.style.maxHeight,
+      overflow: scheduleWrapper.value.style.overflow,
+      background: scheduleWrapper.value.style.background,
+      backgroundImage: scheduleWrapper.value.style.backgroundImage,
+      backgroundSize: scheduleWrapper.value.style.backgroundSize,
+      backgroundPosition: scheduleWrapper.value.style.backgroundPosition,
+      backgroundAttachment: scheduleWrapper.value.style.backgroundAttachment,
+      backgroundRepeat: scheduleWrapper.value.style.backgroundRepeat
+    }
+
+    // 获取课表的完整尺寸
+    const fullHeight = scheduleTable.value?.scrollHeight || scheduleWrapper.value.scrollHeight
+    const fullWidth = scheduleTable.value?.scrollWidth || scheduleWrapper.value.scrollWidth
 
     // 关键修复：html2canvas 不支持 background-attachment: fixed
-    // 需要在导出时临时改为 scroll 模式，并设置正确的背景尺寸
+    // 需要临时改为 scroll 模式，并确保背景覆盖整个内容区域
     if (exportWithBg.value && background.value) {
-      // 保存原始样式
-      const originalBgAttachment = exportContainer.value.style.backgroundAttachment
-      const originalBgSize = exportContainer.value.style.backgroundSize
-      const originalBgPosition = exportContainer.value.style.backgroundPosition
-      const originalBgRepeat = exportContainer.value.style.backgroundRepeat
+      const opacity = backgroundOpacity.value
       
-      // 临时修改为 scroll 模式，确保背景能正确渲染
-      exportContainer.value.style.backgroundAttachment = 'scroll'
-      // 使用 cover 确保背景覆盖整个内容区域
-      exportContainer.value.style.backgroundSize = 'cover'
-      exportContainer.value.style.backgroundPosition = 'center top'
-      exportContainer.value.style.backgroundRepeat = 'no-repeat'
-      
-      const canvas = await html2canvas(exportContainer.value, {
-        scale: exportScale.value,
-        useCORS: true,
-        allowTaint: true,
-        backgroundColor: null,
-        logging: false,
-        width: 1400,
-        height: contentHeight,
-        windowWidth: 1400,
-        windowHeight: contentHeight,
-        onclone: (clonedDoc) => {
-          // 在克隆的文档中也确保背景样式正确
-          const clonedContainer = clonedDoc.querySelector('.export-container') as HTMLElement
-          if (clonedContainer) {
-            clonedContainer.style.backgroundAttachment = 'scroll'
-            clonedContainer.style.backgroundSize = 'cover'
-            clonedContainer.style.backgroundPosition = 'center top'
-            clonedContainer.style.backgroundRepeat = 'no-repeat'
-          }
-        }
-      })
-      
-      // 恢复原始样式
-      exportContainer.value.style.backgroundAttachment = originalBgAttachment
-      exportContainer.value.style.backgroundSize = originalBgSize
-      exportContainer.value.style.backgroundPosition = originalBgPosition
-      exportContainer.value.style.backgroundRepeat = originalBgRepeat
-
-      // 隐藏导出容器
-      exportContainer.value.style.display = 'none'
-      exportContainer.value.style.visibility = 'hidden'
-
-      const link = document.createElement('a')
-      link.download = `课程表_${currentTerm.value}_第${currentWeek.value}周.${exportFormat.value}`
-      link.href = canvas.toDataURL(`image/${exportFormat.value}`, exportQuality.value)
-      link.click()
-    } else {
-      // 没有背景图片的情况
-      const canvas = await html2canvas(exportContainer.value, {
-        scale: exportScale.value,
-        useCORS: true,
-        allowTaint: true,
-        backgroundColor: null,
-        logging: false,
-        width: 1400,
-        height: contentHeight,
-        windowWidth: 1400,
-        windowHeight: contentHeight
-      })
-
-      // 隐藏导出容器
-      exportContainer.value.style.display = 'none'
-      exportContainer.value.style.visibility = 'hidden'
-
-      const link = document.createElement('a')
-      link.download = `课程表_${currentTerm.value}_第${currentWeek.value}周.${exportFormat.value}`
-      link.href = canvas.toDataURL(`image/${exportFormat.value}`, exportQuality.value)
-      link.click()
+      if (background.value.startsWith('http') || background.value.startsWith('data:')) {
+        // 图片背景：临时改为 scroll 模式，使用 cover 覆盖整个区域
+        scheduleWrapper.value.style.backgroundImage = `linear-gradient(rgba(255,255,255,${1-opacity}), rgba(255,255,255,${1-opacity})), url(${background.value})`
+        scheduleWrapper.value.style.backgroundSize = 'cover'
+        scheduleWrapper.value.style.backgroundPosition = 'center center'
+        scheduleWrapper.value.style.backgroundAttachment = 'scroll'
+        scheduleWrapper.value.style.backgroundRepeat = 'no-repeat'
+      } else {
+        // 渐变色背景
+        scheduleWrapper.value.style.background = background.value
+      }
+    } else if (!exportWithBg.value) {
+      // 不包含背景时设为白色背景
+      scheduleWrapper.value.style.background = '#ffffff'
     }
+
+    // 临时移除滚动限制，确保捕获完整内容
+    scheduleWrapper.value.style.maxHeight = 'none'
+    scheduleWrapper.value.style.overflow = 'visible'
+
+    // 捕获整个课表
+    const canvas = await html2canvas(scheduleWrapper.value, {
+      scale: exportScale.value,
+      useCORS: true,
+      allowTaint: true,
+      backgroundColor: null,
+      logging: false,
+      width: fullWidth,
+      height: fullHeight,
+      windowWidth: fullWidth,
+      windowHeight: fullHeight,
+      x: 0,
+      y: 0,
+      scrollX: 0,
+      scrollY: 0
+    })
+
+    // 恢复原始样式
+    scheduleWrapper.value.style.maxHeight = originalStyles.maxHeight
+    scheduleWrapper.value.style.overflow = originalStyles.overflow
+    scheduleWrapper.value.style.background = originalStyles.background
+    scheduleWrapper.value.style.backgroundImage = originalStyles.backgroundImage
+    scheduleWrapper.value.style.backgroundSize = originalStyles.backgroundSize
+    scheduleWrapper.value.style.backgroundPosition = originalStyles.backgroundPosition
+    scheduleWrapper.value.style.backgroundAttachment = originalStyles.backgroundAttachment
+    scheduleWrapper.value.style.backgroundRepeat = originalStyles.backgroundRepeat
+
+    // 下载图片
+    const link = document.createElement('a')
+    link.download = `课程表_${currentTerm.value}_第${currentWeek.value}周.${exportFormat.value}`
+    link.href = canvas.toDataURL(`image/${exportFormat.value}`, exportQuality.value)
+    link.click()
 
     closeExportModal()
   } catch (error) {
@@ -2319,149 +2131,6 @@ onUnmounted(() => {
   border-radius: var(--radius-md);
   background: var(--bg-secondary);
   color: var(--text-primary);
-}
-
-/* 导出容器样式 */
-.export-container {
-  position: fixed;
-  left: -9999px;
-  top: 0;
-  visibility: hidden;
-  display: none;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-}
-
-.export-content {
-  box-sizing: border-box;
-}
-
-.export-table-wrapper {
-  box-sizing: border-box;
-}
-
-.export-table-header {
-  display: grid;
-  grid-template-columns: 100px repeat(5, 1fr);
-  background: rgba(248, 249, 250, 0.95);
-  border-bottom: 2px solid #dee2e6;
-}
-
-.export-time-header {
-  padding: 16px;
-  text-align: center;
-  font-weight: 600;
-  color: #6c757d;
-  border-right: 1px solid #e9ecef;
-}
-
-.export-day-header {
-  padding: 16px;
-  text-align: center;
-  border-right: 1px solid #e9ecef;
-}
-
-.export-day-header:last-child {
-  border-right: none;
-}
-
-.export-day-header.today {
-  background: #4f46e5;
-  color: white;
-}
-
-.export-day-name {
-  font-weight: 600;
-  font-size: 15px;
-}
-
-.export-section-header {
-  padding: 10px 16px;
-  background: #e7f3ff;
-  color: #333;
-  font-weight: 600;
-  text-align: center;
-  border-bottom: 1px solid #dee2e6;
-  font-size: 14px;
-}
-
-.export-table-row {
-  display: grid;
-  grid-template-columns: 100px repeat(5, 1fr);
-  border-bottom: 1px solid #e9ecef;
-  min-height: 80px;
-}
-
-.export-time-cell {
-  padding: 12px;
-  text-align: center;
-  border-right: 1px solid #e9ecef;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  background: rgba(248, 249, 250, 0.8);
-}
-
-.export-period-name {
-  font-weight: 600;
-  font-size: 14px;
-  color: #333;
-}
-
-.export-period-time {
-  font-size: 11px;
-  color: #6c757d;
-  margin-top: 2px;
-}
-
-.export-course-cell {
-  padding: 4px;
-  border-right: 1px solid #e9ecef;
-  min-height: 80px;
-}
-
-.export-course-cell:last-child {
-  border-right: none;
-}
-
-.export-course-block {
-  border: 1px solid rgba(0, 0, 0, 0.1);
-  border-radius: 8px;
-  padding: 10px;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  box-sizing: border-box;
-}
-
-.export-course-name {
-  font-size: 13px;
-  font-weight: 600;
-  color: #333;
-  line-height: 1.3;
-}
-
-.export-course-room {
-  font-size: 11px;
-  color: #6c757d;
-  margin-top: auto;
-}
-
-.export-break-row {
-  padding: 10px;
-  background: #fff8e1;
-  text-align: center;
-  border-bottom: 1px solid #e9ecef;
-}
-
-.export-break-row.dinner {
-  background: #fce4ec;
-}
-
-.export-break-label {
-  font-size: 13px;
-  color: #6c757d;
-  font-weight: 500;
 }
 
 /* 响应式 - 移动端优化 */

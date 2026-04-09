@@ -21,6 +21,7 @@ metadata = sqlalchemy.MetaData()
 tasks = sqlalchemy.Table(
     "tasks", metadata,
     sqlalchemy.Column("id", sqlalchemy.Integer, primary_key=True, autoincrement=True),
+    sqlalchemy.Column("user_id", sqlalchemy.Integer, sqlalchemy.ForeignKey("users.id", ondelete="CASCADE"), nullable=False),
     sqlalchemy.Column("title", sqlalchemy.String(500), nullable=False),
     sqlalchemy.Column("detail", sqlalchemy.Text, default=""),
     sqlalchemy.Column("task_type", sqlalchemy.String(20), default="todo"),
@@ -39,6 +40,7 @@ tasks = sqlalchemy.Table(
 notes = sqlalchemy.Table(
     "notes", metadata,
     sqlalchemy.Column("id", sqlalchemy.Integer, primary_key=True, autoincrement=True),
+    sqlalchemy.Column("user_id", sqlalchemy.Integer, sqlalchemy.ForeignKey("users.id", ondelete="CASCADE"), nullable=False),
     sqlalchemy.Column("content", sqlalchemy.Text, default=""),
     sqlalchemy.Column("note_date", sqlalchemy.String(10), nullable=False),
     sqlalchemy.Column("created_at", sqlalchemy.String(19)),
@@ -49,6 +51,7 @@ notes = sqlalchemy.Table(
 inbox = sqlalchemy.Table(
     "inbox", metadata,
     sqlalchemy.Column("id", sqlalchemy.Integer, primary_key=True, autoincrement=True),
+    sqlalchemy.Column("user_id", sqlalchemy.Integer, sqlalchemy.ForeignKey("users.id", ondelete="CASCADE"), nullable=False),
     sqlalchemy.Column("content", sqlalchemy.Text, nullable=False),
     sqlalchemy.Column("created_at", sqlalchemy.String(19)),
 )
@@ -82,6 +85,7 @@ attachments = sqlalchemy.Table(
 courses = sqlalchemy.Table(
     "courses", metadata,
     sqlalchemy.Column("id", sqlalchemy.Integer, primary_key=True, autoincrement=True),
+    sqlalchemy.Column("user_id", sqlalchemy.Integer, sqlalchemy.ForeignKey("users.id", ondelete="CASCADE"), nullable=False),
     sqlalchemy.Column("name", sqlalchemy.String(200), nullable=False),
     sqlalchemy.Column("code", sqlalchemy.String(50), default=""),
     sqlalchemy.Column("hours", sqlalchemy.Integer, default=48),
@@ -101,7 +105,7 @@ courses = sqlalchemy.Table(
 schedule_settings = sqlalchemy.Table(
     "schedule_settings", metadata,
     sqlalchemy.Column("id", sqlalchemy.Integer, primary_key=True, autoincrement=True),
-    sqlalchemy.Column("user_id", sqlalchemy.String(50), default="default"),
+    sqlalchemy.Column("user_id", sqlalchemy.Integer, sqlalchemy.ForeignKey("users.id", ondelete="CASCADE"), nullable=False),
     sqlalchemy.Column("background", sqlalchemy.Text, default=""),
     sqlalchemy.Column("background_opacity", sqlalchemy.Float, default=0.15),
     sqlalchemy.Column("table_opacity", sqlalchemy.Float, default=0.95),

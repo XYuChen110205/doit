@@ -127,29 +127,29 @@
         </div>
       </div>
 
-      <!-- 待办任务 -->
-      <div class="task-overview">
+      <!-- 老板交代的任务 -->
+      <div class="task-overview boss-tasks-card">
         <div class="card-header">
-          <h3>待办任务</h3>
-          <button class="view-all" @click="$router.push('/manager/tasks')">查看全部</button>
+          <h3>📝 老板交代的任务</h3>
+          <button class="view-all" @click="$router.push('/manager/boss-tasks')">查看全部</button>
         </div>
         <div class="task-stats">
           <div class="task-stat">
-            <div class="stat-num pending">{{ pendingTasks }}</div>
+            <div class="stat-num urgent">{{ bossUrgentTasks }}</div>
+            <div class="stat-label">紧急</div>
+          </div>
+          <div class="task-stat">
+            <div class="stat-num pending">{{ bossPendingTasks }}</div>
             <div class="stat-label">待处理</div>
           </div>
           <div class="task-stat">
-            <div class="stat-num progress">{{ progressTasks }}</div>
-            <div class="stat-label">进行中</div>
-          </div>
-          <div class="task-stat">
-            <div class="stat-num completed">{{ completedTasks }}</div>
+            <div class="stat-num completed">{{ bossCompletedTasks }}</div>
             <div class="stat-label">已完成</div>
           </div>
         </div>
         <div class="recent-tasks">
           <div
-            v-for="task in recentTasks"
+            v-for="task in recentBossTasks"
             :key="task.id"
             class="task-item"
             :class="task.status"
@@ -158,12 +158,16 @@
             <div class="task-content">
               <div class="task-title">{{ task.title }}</div>
               <div class="task-meta">
-                <span class="task-assignee">{{ task.assignee }}</span>
-                <span class="task-deadline">{{ task.deadline }}</span>
+                <span class="task-assignee">{{ task.assigner }}</span>
+                <span class="task-deadline">{{ formatDeadline(task.deadline) }}</span>
               </div>
             </div>
             <div class="task-priority" :class="task.priority">{{ task.priorityText }}</div>
           </div>
+        </div>
+        <div v-if="recentBossTasks.length === 0" class="empty-tasks">
+          <p>暂无老板交代的任务</p>
+          <button class="btn-quick-add" @click="$router.push('/manager/boss-tasks')">+ 记录新任务</button>
         </div>
       </div>
     </div>
@@ -201,7 +205,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 
 // 概览数据
 const todaySales = ref('¥12,580')
@@ -213,6 +217,61 @@ const lowStockItems = ref(6)
 const salesTrend = ref({ type: 'up', text: '+15.3% 较昨日' })
 const ordersTrend = ref({ type: 'up', text: '+8.2% 较昨日' })
 const staffStatus = ref('正常运营')
+
+// 老板任务数据
+interface BossTask {
+  id: number
+  title: string
+  assigner: string
+  priority: 'urgent' | 'high' | 'normal' | 'low'
+  status: 'pending' | 'completed'
+  deadline: string
+  createdAt: string
+}
+
+const bossTasks = ref<BossTask[]>([])
+
+const bossUrgentTasks = computed(() => bossTasks.value.filter(t => t.priority === 'urgent' && t.status === 'pending').length)
+const bossPendingTasks = computed(() => bossTasks.value.filter(t => t.status === 'pending').length)
+const bossCompletedTasks = computed(() => bossTasks.value.filter(t => t.status === 'completed').length)
+
+const recentBossTasks = computed(() => {
+  return bossTasks.value
+    .filter(t => t.status === 'pending')
+    .sort((a, b) => {
+      const priorityOrder = { urgent: 0, high: 1, normal: 2, low: 3 }
+      return priorityOrder[a.priority] - priorityOrder[b.priority]
+    })
+    .slice(0, 4)
+    .map(task => ({
+      ...task,
+      priorityText: { urgent: '紧急', high: '重要', normal: '普通', low: '低' }[task.priority]
+    }))
+})
+
+function formatDeadline(deadline: string): string {
+  if (!deadline) return '无截止日期'
+  const date = new Date(deadline)
+  const now = new Date()
+  const diff = date.getTime() - now.getTime()
+  const hours = Math.floor(diff / (1000 * 60 * 60))
+  
+  if (hours < 0) return '已逾期'
+  if (hours < 24) return `${hours}小时后`
+  const days = Math.floor(hours / 24)
+  return `${days}天后`
+}
+
+function loadBossTasks() {
+  const saved = localStorage.getItem('boss_tasks')
+  if (saved) {
+    bossTasks.value = JSON.parse(saved)
+  }
+}
+
+onMounted(() => {
+  loadBossTasks()
+})
 
 // 时间标签
 const timeTabs = [
@@ -794,6 +853,35 @@ function restock(item: typeof lowStockList.value[0]) {
 }
 
 .restock-btn:hover {
+  background: var(--accent-primary-hover);
+}
+
+/* 老板任务卡片样式 */
+.boss-tasks-card .stat-num.urgent {
+  color: #ef4444;
+}
+
+.empty-tasks {
+  text-align: center;
+  padding: var(--space-6);
+  color: var(--text-secondary);
+}
+
+.empty-tasks p {
+  margin-bottom: var(--space-3);
+}
+
+.btn-quick-add {
+  padding: var(--space-2) var(--space-4);
+  background: var(--accent-primary);
+  color: white;
+  border: none;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  font-size: var(--font-size-sm);
+}
+
+.btn-quick-add:hover {
   background: var(--accent-primary-hover);
 }
 

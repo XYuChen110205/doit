@@ -232,6 +232,15 @@ const routes = [
       roles: ['manager']
     }
   },
+  {
+    path: '/manager/boss-tasks',
+    name: 'ManagerBossTasks',
+    component: () => import('../views/roles/manager/BossTasks.vue'),
+    meta: {
+      title: '老板任务',
+      roles: ['manager']
+    }
+  },
 
   // 计算机学生模式路由
   {
