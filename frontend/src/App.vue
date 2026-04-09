@@ -92,7 +92,7 @@ const currentRoutes = computed(() => {
     if (!route.meta?.title) return false
     // 默认角色显示所有默认路由
     if (currentRole.value === 'default') {
-      return ['今日', '收集箱', '日历', '统计', '设置', '诗意写作'].includes(route.meta.title as string)
+      return ['今日', '收集箱', '日历', '统计', '设置', '诗意写作', '今日手账'].includes(route.meta.title as string)
     }
     // 其他角色显示专属路由 + 设置
     return route.meta.roles?.includes(currentRole.value)

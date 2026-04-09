@@ -7,6 +7,7 @@ import SettingsView from '../views/SettingsView.vue'
 import LinksView from '../views/LinksView.vue'
 import LoginView from '../views/LoginView.vue'
 import PoeticWriting from '../views/PoeticWriting.vue'
+import JournalView from '../views/JournalView.vue'
 
 // 角色专属页面
 import MakeupDashboard from '../views/roles/MakeupDashboard.vue'
@@ -347,6 +348,15 @@ const routes = [
     component: PoeticWriting,
     meta: {
       title: '诗意写作',
+      roles: ['default']
+    }
+  },
+  {
+    path: '/journal',
+    name: 'Journal',
+    component: JournalView,
+    meta: {
+      title: '今日手账',
       roles: ['default']
     }
   },// 公开路由，不需要登录
