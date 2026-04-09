@@ -4,15 +4,23 @@ import sqlalchemy
 import os
 from pathlib import Path
 
+# 检测是否在 Vercel 环境
+is_vercel = os.environ.get('VERCEL') == '1'
+
 # 优先使用环境变量中的数据库 URL（生产环境）
 # 格式: postgresql://user:password@host:port/database
 DATABASE_URL = os.getenv("DATABASE_URL", "")
 
-# 如果没有环境变量，使用本地 SQLite（开发环境）
+# 如果没有环境变量
 if not DATABASE_URL:
-    DB_DIR = Path(__file__).resolve().parent.parent
-    DB_PATH = DB_DIR / "todo.db"
-    DATABASE_URL = f"sqlite:///{DB_PATH}"
+    if is_vercel:
+        # Vercel 环境使用内存数据库（因为文件系统不持久化）
+        DATABASE_URL = "sqlite:///:memory:"
+    else:
+        # 本地环境使用文件数据库
+        DB_DIR = Path(__file__).resolve().parent.parent
+        DB_PATH = DB_DIR / "todo.db"
+        DATABASE_URL = f"sqlite:///{DB_PATH}"
 
 database = databases.Database(DATABASE_URL)
 metadata = sqlalchemy.MetaData()
