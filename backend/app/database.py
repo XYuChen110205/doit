@@ -60,7 +60,8 @@ inbox = sqlalchemy.Table(
 tags = sqlalchemy.Table(
     "tags", metadata,
     sqlalchemy.Column("id", sqlalchemy.Integer, primary_key=True, autoincrement=True),
-    sqlalchemy.Column("name", sqlalchemy.String(50), unique=True, nullable=False),
+    sqlalchemy.Column("user_id", sqlalchemy.Integer, sqlalchemy.ForeignKey("users.id", ondelete="CASCADE"), nullable=False),
+    sqlalchemy.Column("name", sqlalchemy.String(50), nullable=False),
     sqlalchemy.Column("color", sqlalchemy.String(7), default="#2C7A92"),
 )
 
