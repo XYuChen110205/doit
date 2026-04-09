@@ -27,31 +27,31 @@ export interface AuthResponse {
 
 // 登录
 export async function login(data: LoginRequest): Promise<AuthResponse> {
-  const response = await client.post('/auth/login', data)
+  const response = await client.post('/api/auth/login', data)
   return response.data
 }
 
 // 注册
 export async function register(data: RegisterRequest): Promise<AuthResponse> {
-  const response = await client.post('/auth/register', data)
+  const response = await client.post('/api/auth/register', data)
   return response.data
 }
 
 // 获取当前用户信息
 export async function getCurrentUser(): Promise<User> {
-  const response = await client.get('/auth/me')
+  const response = await client.get('/api/auth/me')
   return response.data
 }
 
 // 更新用户信息
 export async function updateUser(data: Partial<User>): Promise<User> {
-  const response = await client.put('/auth/me', data)
+  const response = await client.put('/api/auth/me', data)
   return response.data
 }
 
 // 修改密码
 export async function changePassword(oldPassword: string, newPassword: string): Promise<void> {
-  await client.post('/auth/change-password', {
+  await client.post('/api/auth/change-password', {
     old_password: oldPassword,
     new_password: newPassword
   })
