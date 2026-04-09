@@ -1,8 +1,11 @@
 import axios from 'axios'
 import type { ApiResponse } from '../types'
 
+// 根据环境选择 API 地址
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://doit-api.onrender.com'
+
 const client = axios.create({
-  baseURL: 'http://localhost:8000',
+  baseURL: API_BASE_URL,
   headers: {
     'Content-Type': 'application/json'
   }
