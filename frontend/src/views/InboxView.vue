@@ -6,13 +6,19 @@
 
       <!-- 输入框 -->
       <div class="input-box">
-        <input
+        <textarea
           v-model="newContent"
-          type="text"
           class="inbox-input"
-          placeholder="快速记下你的想法..."
-          @keyup.enter="createItem"
-        />
+          placeholder="快速记下你的想法...&#10;支持多行输入，按 Enter 发送，Shift+Enter 换行"
+          @keydown="handleKeydown"
+          rows="3"
+        ></textarea>
+        <div class="input-hint">
+          <span class="hint-text">Enter 发送 · Shift+Enter 换行</span>
+          <button class="send-btn" @click="createItem" :disabled="!newContent.trim()">
+            发送
+          </button>
+        </div>
       </div>
 
       <!-- 条目列表 -->
@@ -73,6 +79,14 @@ async function loadInbox() {
     })
   } catch (error) {
     console.error('加载收集箱失败:', error)
+  }
+}
+
+// 处理键盘事件
+function handleKeydown(e: KeyboardEvent) {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault()
+    createItem()
   }
 }
 
@@ -178,6 +192,9 @@ onMounted(() => {
   background-color: var(--bg-primary);
   transition: var(--transition-normal);
   outline: none;
+  resize: vertical;
+  min-height: 80px;
+  line-height: var(--line-height-normal);
 }
 
 .inbox-input::placeholder {
@@ -187,6 +204,42 @@ onMounted(() => {
 .inbox-input:focus {
   border-color: var(--accent-primary);
   box-shadow: 0 0 0 3px var(--accent-primary-light);
+}
+
+/* 输入框底部提示 */
+.input-hint {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border);
+}
+
+.hint-text {
+  font-size: var(--font-size-xs);
+  color: var(--text-muted);
+}
+
+.send-btn {
+  padding: var(--space-2) var(--space-4);
+  background: var(--accent-primary);
+  color: white;
+  border: none;
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.send-btn:hover:not(:disabled) {
+  background: var(--accent-primary-hover);
+}
+
+.send-btn:disabled {
+  background: var(--text-muted);
+  cursor: not-allowed;
 }
 
 /* 条目列表 */
