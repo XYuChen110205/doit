@@ -9,7 +9,8 @@ is_vercel = os.environ.get('VERCEL') == '1'
 
 # 优先使用环境变量中的数据库 URL（生产环境）
 # 格式: postgresql://user:password@host:port/database
-DATABASE_URL = os.getenv("DATABASE_URL", "")
+# 支持 DATABASE_URL 或 DATABASE_URL_Doit（Vercel 上可能已存在同名变量）
+DATABASE_URL = os.getenv("DATABASE_URL", "") or os.getenv("DATABASE_URL_Doit", "")
 
 # 如果没有环境变量
 if not DATABASE_URL:
