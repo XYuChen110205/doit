@@ -1,19 +1,78 @@
 """FastAPI 应用入口"""
 import os
+import sys
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from app.database import database, create_tables
 from app.response import success
-from app.routers.tasks import router as tasks_router
-from app.routers.notes import router as notes_router
-from app.routers.inbox import router as inbox_router
-from app.routers.stats import router as stats_router
-from app.routers.tags import router as tags_router
-from app.routers.settings import router as settings_router
-from app.routers.task_tags import router as task_tags_router
-from app.routers.courses import router as courses_router
-from app.routers.auth import router as auth_router
+
+print("[Main] Starting to load routers...")
+
+try:
+    from app.routers.tasks import router as tasks_router
+    print("[Main] tasks_router loaded")
+except Exception as e:
+    print(f"[Main] ERROR loading tasks_router: {e}")
+    tasks_router = None
+
+try:
+    from app.routers.notes import router as notes_router
+    print("[Main] notes_router loaded")
+except Exception as e:
+    print(f"[Main] ERROR loading notes_router: {e}")
+    notes_router = None
+
+try:
+    from app.routers.inbox import router as inbox_router
+    print("[Main] inbox_router loaded")
+except Exception as e:
+    print(f"[Main] ERROR loading inbox_router: {e}")
+    inbox_router = None
+
+try:
+    from app.routers.stats import router as stats_router
+    print("[Main] stats_router loaded")
+except Exception as e:
+    print(f"[Main] ERROR loading stats_router: {e}")
+    stats_router = None
+
+try:
+    from app.routers.tags import router as tags_router
+    print("[Main] tags_router loaded")
+except Exception as e:
+    print(f"[Main] ERROR loading tags_router: {e}")
+    tags_router = None
+
+try:
+    from app.routers.settings import router as settings_router
+    print("[Main] settings_router loaded")
+except Exception as e:
+    print(f"[Main] ERROR loading settings_router: {e}")
+    settings_router = None
+
+try:
+    from app.routers.task_tags import router as task_tags_router
+    print("[Main] task_tags_router loaded")
+except Exception as e:
+    print(f"[Main] ERROR loading task_tags_router: {e}")
+    task_tags_router = None
+
+try:
+    from app.routers.courses import router as courses_router
+    print("[Main] courses_router loaded")
+except Exception as e:
+    print(f"[Main] ERROR loading courses_router: {e}")
+    courses_router = None
+
+try:
+    from app.routers.auth import router as auth_router
+    print("[Main] auth_router loaded")
+except Exception as e:
+    print(f"[Main] ERROR loading auth_router: {e}")
+    import traceback
+    traceback.print_exc()
+    auth_router = None
 
 # 检测是否在 Vercel 环境
 is_vercel = os.environ.get('VERCEL') == '1'
@@ -56,17 +115,37 @@ if is_vercel:
         response = await call_next(request)
         return response
 
-app.include_router(tasks_router)
-app.include_router(notes_router)
-app.include_router(inbox_router)
-app.include_router(stats_router)
-app.include_router(tags_router)
-app.include_router(settings_router)
-app.include_router(task_tags_router)
-app.include_router(courses_router)
-app.include_router(auth_router)
+# 只加载成功导入的路由
+routers_loaded = []
+if tasks_router:
+    app.include_router(tasks_router)
+    routers_loaded.append("tasks")
+if notes_router:
+    app.include_router(notes_router)
+    routers_loaded.append("notes")
+if inbox_router:
+    app.include_router(inbox_router)
+    routers_loaded.append("inbox")
+if stats_router:
+    app.include_router(stats_router)
+    routers_loaded.append("stats")
+if tags_router:
+    app.include_router(tags_router)
+    routers_loaded.append("tags")
+if settings_router:
+    app.include_router(settings_router)
+    routers_loaded.append("settings")
+if task_tags_router:
+    app.include_router(task_tags_router)
+    routers_loaded.append("task_tags")
+if courses_router:
+    app.include_router(courses_router)
+    routers_loaded.append("courses")
+if auth_router:
+    app.include_router(auth_router)
+    routers_loaded.append("auth")
 
-print(f"[Main] Routers loaded: auth, tasks, notes, inbox, stats, tags, settings, courses")
+print(f"[Main] Routers loaded: {', '.join(routers_loaded)}")
 
 @app.get("/api/health")
 async def health_check():
