@@ -5,24 +5,47 @@ import sys
 # 添加项目根目录到 Python 路径
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-# 强制刷新输出
-sys.stdout.write(f"[Index] Python version: {sys.version}\n")
-sys.stdout.write(f"[Index] Current directory: {os.getcwd()}\n")
-sys.stdout.write(f"[Index] VERCEL env: {os.environ.get('VERCEL')}\n")
-sys.stdout.write(f"[Index] DATABASE_URL exists: {bool(os.environ.get('DATABASE_URL'))}\n")
-sys.stdout.write(f"[Index] DATABASE_URL_Doit exists: {bool(os.environ.get('DATABASE_URL_Doit'))}\n")
-sys.stdout.flush()
+# 导入 FastAPI 和响应类
+from fastapi import FastAPI
+from fastapi.responses import JSONResponse
 
-# 先导入 app，不创建表（表创建移到 main.py 中处理）
+# 创建一个最基本的 app（先不导入其他东西）
+app = FastAPI(title="Todo System API")
+
+# 定义一个简单的健康检查接口
+@app.get("/")
+async def root():
+    return {"message": "API is running", "status": "ok"}
+
+@app.get("/api/health")
+async def health_check():
+    return {"status": "running", "database": "not connected"}
+
+# 尝试导入真正的路由
 try:
-    from app.main import app
-    sys.stdout.write("[Index] App imported successfully\n")
+    # 先打印日志，方便调试
+    print("[Index] Trying to import main app...")
+    
+    # 导入 main.py 里的 app
+    from app.main import app as real_app
+    
+    # 如果导入成功，用 real_app 替换当前的 app
+    app = real_app
+    print("[Index] Main app imported successfully!")
+    
 except Exception as e:
-    sys.stdout.write(f"[Index] ERROR importing app: {e}\n")
+    # 如果导入失败，记录错误，但保持最基本的 app 运行
+    print(f"[Index] ERROR: Failed to import main app: {e}")
     import traceback
     traceback.print_exc()
-    raise
-sys.stdout.flush()
+    
+    # 添加一个错误提示接口
+    @app.get("/error")
+    async def error_info():
+        return {
+            "error": "Failed to load main application",
+            "details": str(e)
+        }
 
 # Vercel 需要这个 handler
 handler = app
