@@ -1,6 +1,7 @@
 // Task 任务类型
 export interface Task {
-  id: number
+  id: string  // UUID
+  user_id?: string  // UUID
   title: string
   detail: string
   task_type: 'todo' | 'habit' | 'deadline'
@@ -11,6 +12,7 @@ export interface Task {
   end_time: string | null
   source: 'direct' | 'inbox'
   created_at: string
+  updated_at?: string
   completed_at: string | null
   archived: boolean
   tags?: Tag[]
@@ -18,7 +20,8 @@ export interface Task {
 
 // Note 笔记类型
 export interface Note {
-  id: number
+  id: string  // UUID
+  user_id?: string  // UUID
   content: string
   note_date: string
   created_at: string
@@ -27,22 +30,24 @@ export interface Note {
 
 // InboxItem 收集箱条目类型
 export interface InboxItem {
-  id: number
+  id: string  // UUID
+  user_id?: string  // UUID
   content: string
   created_at: string
 }
 
 // Tag 标签类型
 export interface Tag {
-  id: number
+  id: string  // UUID
+  user_id?: string  // UUID
   name: string
   color: string
 }
 
 // Attachment 附件类型
 export interface Attachment {
-  id: number
-  note_id: number
+  id: string  // UUID
+  note_id: string  // UUID
   file_path: string
   file_name: string
   created_at: string
@@ -77,6 +82,8 @@ export interface UpdateTaskRequest {
   due_date?: string | null
   start_time?: string | null
   end_time?: string | null
+  completed_at?: string | null
+  archived?: boolean
 }
 
 // 创建/更新笔记请求体
@@ -101,7 +108,7 @@ export interface StatsData {
     total: number
   }[]
   tag_distribution: {
-    tag_id: number
+    tag_id: string  // UUID
     tag_name: string
     count: number
   }[]
