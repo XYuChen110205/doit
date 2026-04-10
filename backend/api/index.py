@@ -13,17 +13,7 @@ sys.stdout.write(f"[Index] DATABASE_URL exists: {bool(os.environ.get('DATABASE_U
 sys.stdout.write(f"[Index] DATABASE_URL_Doit exists: {bool(os.environ.get('DATABASE_URL_Doit'))}\n")
 sys.stdout.flush()
 
-# 在导入 app 之前先创建表
-try:
-    from app.database import create_tables
-    create_tables()
-    sys.stdout.write("[Index] Database tables created successfully\n")
-except Exception as e:
-    sys.stdout.write(f"[Index] ERROR creating tables: {e}\n")
-    import traceback
-    traceback.print_exc()
-sys.stdout.flush()
-
+# 先导入 app，不创建表（表创建移到 main.py 中处理）
 try:
     from app.main import app
     sys.stdout.write("[Index] App imported successfully\n")

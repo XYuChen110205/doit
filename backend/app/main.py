@@ -149,6 +149,15 @@ async def global_exception_handler(request: Request, exc: Exception):
     )
 
 
+# Vercel 环境：在启动时尝试创建表
+if is_vercel:
+    try:
+        create_tables()
+        print("[Main] Tables created successfully on startup")
+    except Exception as e:
+        print(f"[Main] WARNING: Could not create tables on startup: {e}")
+
+
 # Vercel 环境：使用中间件管理数据库连接
 if is_vercel:
     @app.middleware("http")
