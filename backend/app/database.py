@@ -13,26 +13,47 @@ DATABASE_URL = os.getenv("DATABASE_URL", "") or os.getenv("DATABASE_URL_Doit", "
 print(f"[Database] Initial DATABASE_URL exists: {bool(DATABASE_URL)}")
 print(f"[Database] is_vercel: {is_vercel}")
 
-# Vercel 环境下使用 SQLite 内存数据库（避免 TCP 连接问题）
-if is_vercel:
-    print("[Database] Vercel environment detected, using SQLite in-memory database")
-    DATABASE_URL = "sqlite:///:memory:"
-elif not DATABASE_URL:
-    print("[Database] No DATABASE_URL found, using local SQLite file")
-    # 本地环境使用文件数据库
-    DB_DIR = Path(__file__).resolve().parent.parent
-    DB_PATH = DB_DIR / "todo.db"
-    DATABASE_URL = f"sqlite:///{DB_PATH}"
-else:
-    print(f"[Database] Using provided DATABASE_URL")
+# 处理数据库连接字符串
+if DATABASE_URL and DATABASE_URL.startswith("postgresql://"):
+    print("[Database] PostgreSQL URL detected")
+    
+    # 确保使用 SSL（Supabase 要求）
+    if "sslmode=" not in DATABASE_URL:
+        if "?" in DATABASE_URL:
+            DATABASE_URL += "&sslmode=require"
+        else:
+            DATABASE_URL += "?sslmode=require"
+    
+    # 使用 Supabase PgBouncer 连接池端口 6543
+    if ":5432/" in DATABASE_URL:
+        DATABASE_URL = DATABASE_URL.replace(":5432/", ":6543/")
+        print("[Database] Switched to PgBouncer port 6543")
+    
+    # 添加 PgBouncer 配置
+    if "pgbouncer=true" not in DATABASE_URL:
+        DATABASE_URL += "&pgbouncer=true"
+    
+    print(f"[Database] PostgreSQL URL configured")
 
-print(f"[Database] Final DATABASE_URL: {DATABASE_URL[:50]}..." if len(DATABASE_URL) > 50 else f"[Database] Final DATABASE_URL: {DATABASE_URL}")
+# 如果没有数据库 URL，使用 SQLite
+if not DATABASE_URL:
+    print("[Database] No DATABASE_URL found, using SQLite")
+    if is_vercel:
+        # Vercel 环境使用内存数据库
+        DATABASE_URL = "sqlite:///:memory:"
+    else:
+        # 本地环境使用文件数据库
+        DB_DIR = Path(__file__).resolve().parent.parent
+        DB_PATH = DB_DIR / "todo.db"
+        DATABASE_URL = f"sqlite:///{DB_PATH}"
+
+print(f"[Database] Final database type: {'PostgreSQL' if DATABASE_URL.startswith('postgresql') else 'SQLite'}")
 
 # 创建数据库连接
 database = databases.Database(DATABASE_URL)
 metadata = sqlalchemy.MetaData()
 
-# ---- 用户表（先定义，因为其他表依赖它）----
+# ---- 用户表 ----
 users = sqlalchemy.Table(
     "users", metadata,
     sqlalchemy.Column("id", sqlalchemy.Integer, primary_key=True, autoincrement=True),
@@ -148,7 +169,7 @@ schedule_settings = sqlalchemy.Table(
 def create_tables():
     """创建数据库表"""
     try:
-        print(f"[Database] Creating tables with URL: {DATABASE_URL[:30]}...")
+        print(f"[Database] Creating tables...")
         engine = sqlalchemy.create_engine(DATABASE_URL)
         metadata.create_all(engine)
         engine.dispose()
