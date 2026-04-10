@@ -2,7 +2,7 @@ import axios from 'axios'
 import type { ApiResponse } from '../types'
 
 // 根据环境选择 API 地址
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://doit-api.onrender.com'
+const API_BASE_URL = 'https://doit-api-omega.vercel.app'
 
 const client = axios.create({
   baseURL: API_BASE_URL,
