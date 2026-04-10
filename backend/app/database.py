@@ -11,52 +11,38 @@ is_vercel = os.environ.get('VERCEL') == '1'
 DATABASE_URL = os.getenv("DATABASE_URL", "") or os.getenv("DATABASE_URL_Doit", "")
 
 print(f"[Database] Initial DATABASE_URL exists: {bool(DATABASE_URL)}")
+print(f"[Database] is_vercel: {is_vercel}")
 
-# 如果是 Supabase 连接字符串，优化配置
-if DATABASE_URL.startswith("postgresql://"):
-    # 确保使用 SSL
-    if "?" in DATABASE_URL:
-        if "sslmode=" not in DATABASE_URL:
-            DATABASE_URL += "&sslmode=require"
-    else:
-        DATABASE_URL += "?sslmode=require"
-    
-    # 使用 Supabase PgBouncer 连接池（端口 6543）替代直接连接（端口 5432）
-    if ":5432/" in DATABASE_URL:
-        DATABASE_URL = DATABASE_URL.replace(":5432/", ":6543/")
-        print("[Database] Switched to PgBouncer port 6543")
-    
-    # 添加 PgBouncer 配置
-    if "pgbouncer=true" not in DATABASE_URL:
-        DATABASE_URL += "&pgbouncer=true"
-    
-    print(f"[Database] PostgreSQL URL configured with SSL and PgBouncer")
+# Vercel 环境下使用 SQLite 内存数据库（避免 TCP 连接问题）
+if is_vercel:
+    print("[Database] Vercel environment detected, using SQLite in-memory database")
+    DATABASE_URL = "sqlite:///:memory:"
+elif not DATABASE_URL:
+    print("[Database] No DATABASE_URL found, using local SQLite file")
+    # 本地环境使用文件数据库
+    DB_DIR = Path(__file__).resolve().parent.parent
+    DB_PATH = DB_DIR / "todo.db"
+    DATABASE_URL = f"sqlite:///{DB_PATH}"
+else:
+    print(f"[Database] Using provided DATABASE_URL")
 
-if not DATABASE_URL:
-    print("[Database] WARNING: No DATABASE_URL found, using SQLite")
-    if is_vercel:
-        # Vercel 环境但没有数据库配置，使用内存数据库（数据不持久化）
-        DATABASE_URL = "sqlite:///:memory:"
-    else:
-        # 本地环境使用文件数据库
-        DB_DIR = Path(__file__).resolve().parent.parent
-        DB_PATH = DB_DIR / "todo.db"
-        DATABASE_URL = f"sqlite:///{DB_PATH}"
+print(f"[Database] Final DATABASE_URL: {DATABASE_URL[:50]}..." if len(DATABASE_URL) > 50 else f"[Database] Final DATABASE_URL: {DATABASE_URL}")
 
-print(f"[Database] Final database type: {'PostgreSQL' if DATABASE_URL.startswith('postgresql') else 'SQLite'}")
-
-# 配置数据库连接选项
-database_options = {}
-if DATABASE_URL.startswith("postgresql://"):
-    # PostgreSQL 特定配置
-    database_options = {
-        "min_size": 1,
-        "max_size": 10,
-        "command_timeout": 60,
-    }
-
-database = databases.Database(DATABASE_URL, **database_options)
+# 创建数据库连接
+database = databases.Database(DATABASE_URL)
 metadata = sqlalchemy.MetaData()
+
+# ---- 用户表（先定义，因为其他表依赖它）----
+users = sqlalchemy.Table(
+    "users", metadata,
+    sqlalchemy.Column("id", sqlalchemy.Integer, primary_key=True, autoincrement=True),
+    sqlalchemy.Column("username", sqlalchemy.String(50), unique=True, nullable=False),
+    sqlalchemy.Column("email", sqlalchemy.String(100), unique=True, nullable=False),
+    sqlalchemy.Column("hashed_password", sqlalchemy.String(255), nullable=False),
+    sqlalchemy.Column("avatar", sqlalchemy.String(500), default=None),
+    sqlalchemy.Column("created_at", sqlalchemy.DateTime, default=sqlalchemy.func.now()),
+    sqlalchemy.Column("updated_at", sqlalchemy.DateTime, default=None),
+)
 
 # ---- 任务表 ----
 tasks = sqlalchemy.Table(
@@ -131,8 +117,8 @@ courses = sqlalchemy.Table(
     sqlalchemy.Column("name", sqlalchemy.String(200), nullable=False),
     sqlalchemy.Column("code", sqlalchemy.String(50), default=""),
     sqlalchemy.Column("hours", sqlalchemy.Integer, default=48),
-    sqlalchemy.Column("day", sqlalchemy.String(10), nullable=False),  # mon, tue, wed, thu, fri
-    sqlalchemy.Column("period", sqlalchemy.Integer, nullable=False),  # 1-12
+    sqlalchemy.Column("day", sqlalchemy.String(10), nullable=False),
+    sqlalchemy.Column("period", sqlalchemy.Integer, nullable=False),
     sqlalchemy.Column("weeks", sqlalchemy.String(50), default="1-17周"),
     sqlalchemy.Column("room", sqlalchemy.String(200), default=""),
     sqlalchemy.Column("teacher", sqlalchemy.String(100), default=""),
@@ -158,27 +144,18 @@ schedule_settings = sqlalchemy.Table(
     sqlalchemy.Column("updated_at", sqlalchemy.String(19)),
 )
 
-# ---- 用户表 ----
-users = sqlalchemy.Table(
-    "users", metadata,
-    sqlalchemy.Column("id", sqlalchemy.Integer, primary_key=True, autoincrement=True),
-    sqlalchemy.Column("username", sqlalchemy.String(50), unique=True, nullable=False),
-    sqlalchemy.Column("email", sqlalchemy.String(100), unique=True, nullable=False),
-    sqlalchemy.Column("hashed_password", sqlalchemy.String(255), nullable=False),
-    sqlalchemy.Column("avatar", sqlalchemy.String(500), default=None),
-    sqlalchemy.Column("created_at", sqlalchemy.DateTime, default=sqlalchemy.func.now()),
-    sqlalchemy.Column("updated_at", sqlalchemy.DateTime, default=None),
-)
-
 
 def create_tables():
+    """创建数据库表"""
     try:
+        print(f"[Database] Creating tables with URL: {DATABASE_URL[:30]}...")
         engine = sqlalchemy.create_engine(DATABASE_URL)
         metadata.create_all(engine)
         engine.dispose()
         print("[Database] Tables created successfully")
+        return True
     except Exception as e:
         print(f"[Database] ERROR creating tables: {e}")
         import traceback
         traceback.print_exc()
-        raise
+        return False
