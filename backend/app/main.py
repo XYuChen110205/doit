@@ -1,9 +1,11 @@
 """FastAPI 应用入口"""
 import os
 import sys
+import asyncio
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from app.database import database, create_tables
 from app.response import success
 
@@ -81,12 +83,32 @@ print(f"[Main] VERCEL env: {os.environ.get('VERCEL')}")
 print(f"[Main] is_vercel: {is_vercel}")
 
 
+async def connect_database_with_retry(max_retries=3, delay=1):
+    """带重试的数据库连接"""
+    for attempt in range(max_retries):
+        try:
+            if not database.is_connected:
+                await database.connect()
+                print(f"[Main] Database connected successfully on attempt {attempt + 1}")
+                return True
+            return True
+        except Exception as e:
+            print(f"[Main] Database connection attempt {attempt + 1} failed: {e}")
+            if attempt < max_retries - 1:
+                await asyncio.sleep(delay)
+            else:
+                print(f"[Main] All database connection attempts failed")
+                return False
+    return False
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     create_tables()
-    await database.connect()
+    await connect_database_with_retry()
     yield
-    await database.disconnect()
+    if database.is_connected:
+        await database.disconnect()
 
 
 # 创建 FastAPI 应用
@@ -97,13 +119,35 @@ else:
     # 本地环境：正常使用 lifespan
     app = FastAPI(title="Todo System API", lifespan=lifespan)
 
+# 配置 CORS - 必须放在其他中间件之前
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "https://doit-bi9.pages.dev",
+        "http://localhost:5173",
+        "http://localhost:3000",
+        "*"  # 临时允许所有来源用于调试
+    ],
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     allow_headers=["*"],
+    expose_headers=["*"],
+    max_age=86400,  # 预检请求缓存24小时
 )
+
+
+# 全局异常处理
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    """处理所有未捕获的异常，确保返回 JSON 格式"""
+    print(f"[Main] Global exception: {exc}")
+    import traceback
+    traceback.print_exc()
+    return JSONResponse(
+        status_code=500,
+        content={"code": 500, "message": "Internal server error", "data": None}
+    )
+
 
 # Vercel 环境：使用中间件管理数据库连接
 if is_vercel:
@@ -111,9 +155,28 @@ if is_vercel:
     async def db_connection_middleware(request: Request, call_next):
         # 确保数据库已连接
         if not database.is_connected:
-            await database.connect()
-        response = await call_next(request)
-        return response
+            connected = await connect_database_with_retry()
+            if not connected:
+                # 数据库连接失败，返回 503 服务不可用
+                return JSONResponse(
+                    status_code=503,
+                    content={"code": 503, "message": "Database connection failed", "data": None},
+                    headers={
+                        "Access-Control-Allow-Origin": "*",
+                        "Access-Control-Allow-Credentials": "true",
+                    }
+                )
+        try:
+            response = await call_next(request)
+            return response
+        except Exception as e:
+            print(f"[Main] Request processing error: {e}")
+            import traceback
+            traceback.print_exc()
+            return JSONResponse(
+                status_code=500,
+                content={"code": 500, "message": "Internal server error", "data": None}
+            )
 
 # 只加载成功导入的路由
 routers_loaded = []
@@ -147,10 +210,30 @@ if auth_router:
 
 print(f"[Main] Routers loaded: {', '.join(routers_loaded)}")
 
+
 @app.get("/api/health")
 async def health_check():
-    return success(data={"status": "running"})
+    db_status = "connected" if database.is_connected else "disconnected"
+    return success(data={"status": "running", "database": db_status})
+
 
 @app.get("/")
 async def root():
     return success(data={"message": "Todo API is running", "docs": "/docs"})
+
+
+# OPTIONS 请求处理 - 确保预检请求能正确响应
+@app.options("/{path:path}")
+async def options_handler(path: str):
+    """处理所有 OPTIONS 预检请求"""
+    from fastapi.responses import Response
+    return Response(
+        status_code=200,
+        headers={
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS, PATCH",
+            "Access-Control-Allow-Headers": "*",
+            "Access-Control-Allow-Credentials": "true",
+            "Access-Control-Max-Age": "86400",
+        }
+    )

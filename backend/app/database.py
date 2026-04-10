@@ -7,14 +7,28 @@ from pathlib import Path
 # 检测是否在 Vercel 环境
 is_vercel = os.environ.get('VERCEL') == '1'
 
-if is_vercel:
-    # Vercel 环境使用内存数据库（因为文件系统不持久化，且外部数据库连接可能受限）
-    DATABASE_URL = "sqlite:///:memory:"
-else:
-    # 本地环境使用文件数据库
-    DB_DIR = Path(__file__).resolve().parent.parent
-    DB_PATH = DB_DIR / "todo.db"
-    DATABASE_URL = f"sqlite:///{DB_PATH}"
+# 优先使用环境变量中的数据库 URL
+DATABASE_URL = os.getenv("DATABASE_URL", "") or os.getenv("DATABASE_URL_Doit", "")
+
+# 如果是 Supabase 连接字符串，改用连接池端口
+if DATABASE_URL.startswith("postgresql://") and ":5432/" in DATABASE_URL:
+    # 使用 Supabase PgBouncer 连接池（端口 6543）
+    DATABASE_URL = DATABASE_URL.replace(":5432/", ":6543/")
+    # 添加 PgBouncer 配置
+    if "?" in DATABASE_URL:
+        DATABASE_URL += "&pgbouncer=true"
+    else:
+        DATABASE_URL += "?pgbouncer=true"
+
+if not DATABASE_URL:
+    if is_vercel:
+        # Vercel 环境但没有数据库配置，使用内存数据库（数据不持久化）
+        DATABASE_URL = "sqlite:///:memory:"
+    else:
+        # 本地环境使用文件数据库
+        DB_DIR = Path(__file__).resolve().parent.parent
+        DB_PATH = DB_DIR / "todo.db"
+        DATABASE_URL = f"sqlite:///{DB_PATH}"
 
 database = databases.Database(DATABASE_URL)
 metadata = sqlalchemy.MetaData()
