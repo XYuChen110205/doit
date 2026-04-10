@@ -23,9 +23,9 @@ export interface AuthResponse {
   user: User
 }
 
-// 将 username 转换为 email 格式
+// 将 username 转换为 email 格式（使用真实域名）
 function usernameToEmail(username: string): string {
-  return `${username}@todo.local`
+  return `${username}@doit-app.com`
 }
 
 // 注册
