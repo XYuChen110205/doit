@@ -10,17 +10,30 @@ is_vercel = os.environ.get('VERCEL') == '1'
 # 优先使用环境变量中的数据库 URL
 DATABASE_URL = os.getenv("DATABASE_URL", "") or os.getenv("DATABASE_URL_Doit", "")
 
-# 如果是 Supabase 连接字符串，改用连接池端口
-if DATABASE_URL.startswith("postgresql://") and ":5432/" in DATABASE_URL:
-    # 使用 Supabase PgBouncer 连接池（端口 6543）
-    DATABASE_URL = DATABASE_URL.replace(":5432/", ":6543/")
-    # 添加 PgBouncer 配置
+print(f"[Database] Initial DATABASE_URL exists: {bool(DATABASE_URL)}")
+
+# 如果是 Supabase 连接字符串，优化配置
+if DATABASE_URL.startswith("postgresql://"):
+    # 确保使用 SSL
     if "?" in DATABASE_URL:
-        DATABASE_URL += "&pgbouncer=true"
+        if "sslmode=" not in DATABASE_URL:
+            DATABASE_URL += "&sslmode=require"
     else:
-        DATABASE_URL += "?pgbouncer=true"
+        DATABASE_URL += "?sslmode=require"
+    
+    # 使用 Supabase PgBouncer 连接池（端口 6543）替代直接连接（端口 5432）
+    if ":5432/" in DATABASE_URL:
+        DATABASE_URL = DATABASE_URL.replace(":5432/", ":6543/")
+        print("[Database] Switched to PgBouncer port 6543")
+    
+    # 添加 PgBouncer 配置
+    if "pgbouncer=true" not in DATABASE_URL:
+        DATABASE_URL += "&pgbouncer=true"
+    
+    print(f"[Database] PostgreSQL URL configured with SSL and PgBouncer")
 
 if not DATABASE_URL:
+    print("[Database] WARNING: No DATABASE_URL found, using SQLite")
     if is_vercel:
         # Vercel 环境但没有数据库配置，使用内存数据库（数据不持久化）
         DATABASE_URL = "sqlite:///:memory:"
@@ -30,7 +43,19 @@ if not DATABASE_URL:
         DB_PATH = DB_DIR / "todo.db"
         DATABASE_URL = f"sqlite:///{DB_PATH}"
 
-database = databases.Database(DATABASE_URL)
+print(f"[Database] Final database type: {'PostgreSQL' if DATABASE_URL.startswith('postgresql') else 'SQLite'}")
+
+# 配置数据库连接选项
+database_options = {}
+if DATABASE_URL.startswith("postgresql://"):
+    # PostgreSQL 特定配置
+    database_options = {
+        "min_size": 1,
+        "max_size": 10,
+        "command_timeout": 60,
+    }
+
+database = databases.Database(DATABASE_URL, **database_options)
 metadata = sqlalchemy.MetaData()
 
 # ---- 任务表 ----
@@ -147,6 +172,13 @@ users = sqlalchemy.Table(
 
 
 def create_tables():
-    engine = sqlalchemy.create_engine(DATABASE_URL)
-    metadata.create_all(engine)
-    engine.dispose()
+    try:
+        engine = sqlalchemy.create_engine(DATABASE_URL)
+        metadata.create_all(engine)
+        engine.dispose()
+        print("[Database] Tables created successfully")
+    except Exception as e:
+        print(f"[Database] ERROR creating tables: {e}")
+        import traceback
+        traceback.print_exc()
+        raise
