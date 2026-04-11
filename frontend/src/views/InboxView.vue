@@ -1,58 +1,109 @@
 <template>
   <div class="inbox-view">
-    <div class="inbox-container">
-      <!-- 标题 -->
-      <h1 class="inbox-title">收集箱</h1>
+    <!-- 加载状态 -->
+    <div v-if="isLoading" class="loading-state">
+      <SvgIcon name="Loading" :size="32" />
+      <span>加载中...</span>
+    </div>
 
-      <!-- 输入框 -->
-      <div class="input-box">
-        <textarea
-          v-model="newContent"
-          class="inbox-input"
-          placeholder="快速记下你的想法...&#10;支持多行输入，按 Enter 发送，Shift+Enter 换行"
-          @keydown="handleKeydown"
-          rows="3"
-        ></textarea>
-        <div class="input-hint">
-          <span class="hint-text">Enter 发送 · Shift+Enter 换行</span>
-          <button class="send-btn" @click="createItem" :disabled="!newContent.trim()">
-            发送
+    <template v-else>
+      <!-- 添加新条目 -->
+      <div class="add-section">
+        <div class="input-wrapper">
+          <input
+            v-model="newItemContent"
+            type="text"
+            class="inbox-input"
+            placeholder="记录任何想法、待办事项..."
+            @keyup.enter="addItem"
+          />
+          <button
+            class="add-btn"
+            :disabled="!newItemContent.trim()"
+            @click="addItem"
+          >
+            <SvgIcon name="Plus" :size="16" />
+            添加
           </button>
         </div>
       </div>
 
       <!-- 条目列表 -->
-      <div class="inbox-list">
+      <div class="items-list">
         <div
-          v-for="item in inboxItems"
+          v-for="item in items"
           :key="item.id"
           class="inbox-item"
+          :class="{ 'is-processing': item.isProcessing }"
         >
           <div class="item-content">
             <span class="item-text">{{ item.content }}</span>
-            <span class="item-time">{{ formatTime(item.created_at) }}</span>
+            <span class="item-date">{{ formatDate(item.created_at) }}</span>
           </div>
           <div class="item-actions">
-            <button class="action-btn convert" @click="convertItem(item.id)">
-              转为任务
+            <button
+              class="action-btn convert"
+              :disabled="item.isProcessing"
+              @click="convertToTask(item)"
+              title="转为任务"
+            >
+              <SvgIcon name="Task" :size="16" />
+              <span>转任务</span>
             </button>
-            <button class="action-btn delete" @click="deleteItem(item.id)">
-              删除
+            <button
+              class="action-btn delete"
+              @click="confirmDelete(item)"
+              title="删除"
+            >
+              <SvgIcon name="Trash" :size="16" />
             </button>
           </div>
         </div>
 
         <!-- 空状态 -->
-        <div v-if="inboxItems.length === 0" class="empty-state">
-          还没有想法，随时记录吧
+        <div v-if="items.length === 0" class="empty-state">
+          <SvgIcon name="InboxEmpty" :size="64" />
+          <h3>收集箱是空的</h3>
+          <p>把任何想法、待办事项先丢进来，稍后再整理</p>
+          <div class="empty-tips">
+            <div class="tip-item">
+              <SvgIcon name="Plus" :size="14" />
+              <span>快速记录灵感</span>
+            </div>
+            <div class="tip-item">
+              <SvgIcon name="Task" :size="14" />
+              <span>随时转为正式任务</span>
+            </div>
+          </div>
         </div>
       </div>
-    </div>
+    </template>
 
-    <!-- Toast 提示 -->
+    <!-- 删除确认弹窗 -->
+    <BaseModal v-model="showDeleteConfirm" title="确认删除">
+      <div class="confirm-content">
+        <p>确定要删除这条记录吗？</p>
+        <p class="confirm-hint">删除后将无法恢复</p>
+      </div>
+      <template #footer>
+        <BaseButton variant="secondary" @click="showDeleteConfirm = false">取消</BaseButton>
+        <BaseButton variant="danger" @click="executeDelete">删除</BaseButton>
+      </template>
+    </BaseModal>
+
+    <!-- 错误提示 -->
     <Transition name="toast">
-      <div v-if="toastMessage" class="toast">
-        {{ toastMessage }}
+      <div v-if="errorMessage" class="error-toast">
+        <SvgIcon name="Alert" :size="16" />
+        <span>{{ errorMessage }}</span>
+      </div>
+    </Transition>
+
+    <!-- 成功提示 -->
+    <Transition name="toast">
+      <div v-if="successMessage" class="success-toast">
+        <SvgIcon name="Check" :size="16" />
+        <span>{{ successMessage }}</span>
       </div>
     </Transition>
   </div>
@@ -60,145 +111,184 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
+import { listInboxItems, createInboxItem, deleteInboxItem } from '../api/inbox'
+import { createTask } from '../api/tasks'
 import type { InboxItem } from '../types'
-import { createInbox, listInbox, convertInbox, deleteInbox } from '../api/inbox'
+import SvgIcon from '../components/icons/SvgIcon.vue'
+import BaseModal from '../components/base/BaseModal.vue'
+import BaseButton from '../components/base/BaseButton.vue'
 
-// 收集箱条目
-const inboxItems = ref<InboxItem[]>([])
-const newContent = ref('')
-const toastMessage = ref('')
-let toastTimer: ReturnType<typeof setTimeout> | null = null
+const router = useRouter()
 
-// 加载列表
-async function loadInbox() {
+const items = ref<InboxItem[]>([])
+const newItemContent = ref('')
+const isLoading = ref(false)
+const errorMessage = ref('')
+const successMessage = ref('')
+const showDeleteConfirm = ref(false)
+const itemToDelete = ref<InboxItem | null>(null)
+
+let errorTimer: ReturnType<typeof setTimeout> | null = null
+let successTimer: ReturnType<typeof setTimeout> | null = null
+
+// 显示错误提示
+function showError(message: string) {
+  errorMessage.value = message
+  if (errorTimer) clearTimeout(errorTimer)
+  errorTimer = setTimeout(() => {
+    errorMessage.value = ''
+  }, 3000)
+}
+
+// 显示成功提示
+function showSuccess(message: string) {
+  successMessage.value = message
+  if (successTimer) clearTimeout(successTimer)
+  successTimer = setTimeout(() => {
+    successMessage.value = ''
+  }, 3000)
+}
+
+// 格式化日期
+function formatDate(dateString: string): string {
+  const date = new Date(dateString)
+  const now = new Date()
+  const diff = now.getTime() - date.getTime()
+  const minutes = Math.floor(diff / 60000)
+  const hours = Math.floor(diff / 3600000)
+  const days = Math.floor(diff / 86400000)
+
+  if (minutes < 1) return '刚刚'
+  if (minutes < 60) return `${minutes}分钟前`
+  if (hours < 24) return `${hours}小时前`
+  if (days < 7) return `${days}天前`
+  return date.toLocaleDateString('zh-CN')
+}
+
+// 加载收集箱条目
+async function loadItems() {
+  isLoading.value = true
   try {
-    const items = await listInbox()
-    // 按创建时间倒序排列
-    inboxItems.value = items.sort((a, b) => {
-      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-    })
+    items.value = await listInboxItems()
   } catch (error) {
     console.error('加载收集箱失败:', error)
+    showError('加载失败，请检查网络连接')
+  } finally {
+    isLoading.value = false
   }
 }
 
-// 处理键盘事件
-function handleKeydown(e: KeyboardEvent) {
-  if (e.key === 'Enter' && !e.shiftKey) {
-    e.preventDefault()
-    createItem()
-  }
-}
-
-// 创建条目
-async function createItem() {
-  const content = newContent.value.trim()
+// 添加新条目
+async function addItem() {
+  const content = newItemContent.value.trim()
   if (!content) return
 
   try {
-    await createInbox(content)
-    newContent.value = ''
-    await loadInbox()
+    await createInboxItem({ content })
+    newItemContent.value = ''
+    await loadItems()
+    showSuccess('已添加到收集箱')
   } catch (error) {
-    console.error('创建收集箱条目失败:', error)
+    console.error('添加失败:', error)
+    showError('添加失败，请重试')
+  }
+}
+
+// 确认删除
+function confirmDelete(item: InboxItem) {
+  itemToDelete.value = item
+  showDeleteConfirm.value = true
+}
+
+// 执行删除
+async function executeDelete() {
+  if (!itemToDelete.value) return
+
+  try {
+    await deleteInboxItem(itemToDelete.value.id)
+    await loadItems()
+    showDeleteConfirm.value = false
+    itemToDelete.value = null
+    showSuccess('已删除')
+  } catch (error) {
+    console.error('删除失败:', error)
+    showError('删除失败')
   }
 }
 
 // 转为任务
-async function convertItem(id: number) {
+async function convertToTask(item: InboxItem) {
+  item.isProcessing = true
   try {
-    await convertInbox(id)
-    await loadInbox()
-    showToast('已转为任务')
+    // 创建任务
+    const today = new Date().toISOString().split('T')[0]
+    await createTask({
+      title: item.content,
+      due_date: today,
+      source: 'inbox'
+    })
+
+    // 删除收集箱条目
+    await deleteInboxItem(item.id)
+
+    await loadItems()
+    showSuccess('已转为今日任务')
   } catch (error) {
-    console.error('转为任务失败:', error)
+    console.error('转换失败:', error)
+    showError('转换失败，请重试')
+  } finally {
+    item.isProcessing = false
   }
 }
 
-// 删除条目
-async function deleteItem(id: number) {
-  try {
-    await deleteInbox(id)
-    await loadInbox()
-  } catch (error) {
-    console.error('删除收集箱条目失败:', error)
-  }
-}
-
-// 格式化时间
-function formatTime(timeStr: string): string {
-  const date = new Date(timeStr)
-  const month = date.getMonth() + 1
-  const day = date.getDate()
-  const hours = date.getHours().toString().padStart(2, '0')
-  const minutes = date.getMinutes().toString().padStart(2, '0')
-  return `${month}月${day}日 ${hours}:${minutes}`
-}
-
-// 显示 Toast
-function showToast(message: string) {
-  toastMessage.value = message
-  if (toastTimer) clearTimeout(toastTimer)
-  toastTimer = setTimeout(() => {
-    toastMessage.value = ''
-  }, 2000)
-}
-
-// 初始化
 onMounted(() => {
-  loadInbox()
+  loadItems()
 })
 </script>
 
 <style scoped>
 .inbox-view {
-  min-height: calc(100vh - 64px - var(--space-8) * 2);
-  padding: var(--space-8);
+  max-width: 800px;
+  margin: 0 auto;
+  padding: var(--space-6);
 }
 
-.inbox-container {
-  max-width: 680px;
-  margin: 0 auto;
+/* 加载状态 */
+.loading-state {
   display: flex;
   flex-direction: column;
-  gap: var(--space-6);
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  padding: var(--space-10);
+  color: var(--text-secondary);
 }
 
-/* 标题 */
-.inbox-title {
-  font-size: var(--font-size-2xl);
-  font-weight: var(--font-weight-bold);
-  color: var(--text-primary);
-  letter-spacing: var(--letter-spacing-wide);
-  text-align: center;
+/* 添加区域 */
+.add-section {
+  margin-bottom: var(--space-6);
 }
 
-/* 输入框 */
-.input-box {
-  background-color: var(--bg-card);
-  border-radius: var(--radius-lg);
+.input-wrapper {
+  display: flex;
+  gap: var(--space-3);
+  background: var(--bg-card);
   padding: var(--space-4);
+  border-radius: var(--radius-lg);
   box-shadow: var(--shadow-card);
 }
 
 .inbox-input {
-  width: 100%;
+  flex: 1;
   padding: var(--space-3) var(--space-4);
-  border: 1px solid var(--border);
+  border: 2px solid var(--border);
   border-radius: var(--radius-md);
-  font-family: var(--font-family-base);
   font-size: var(--font-size-md);
+  background: var(--bg-primary);
   color: var(--text-primary);
-  background-color: var(--bg-primary);
-  transition: var(--transition-normal);
   outline: none;
-  resize: vertical;
-  min-height: 80px;
-  line-height: var(--line-height-normal);
-}
-
-.inbox-input::placeholder {
-  color: var(--text-muted);
+  transition: var(--transition-normal);
 }
 
 .inbox-input:focus {
@@ -206,44 +296,39 @@ onMounted(() => {
   box-shadow: 0 0 0 3px var(--accent-primary-light);
 }
 
-/* 输入框底部提示 */
-.input-hint {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-top: var(--space-3);
-  padding-top: var(--space-3);
-  border-top: 1px solid var(--border);
-}
-
-.hint-text {
-  font-size: var(--font-size-xs);
+.inbox-input::placeholder {
   color: var(--text-muted);
 }
 
-.send-btn {
-  padding: var(--space-2) var(--space-4);
+.add-btn {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-6);
   background: var(--accent-primary);
   color: white;
   border: none;
   border-radius: var(--radius-md);
-  font-size: var(--font-size-sm);
+  font-size: var(--font-size-md);
   font-weight: var(--font-weight-medium);
   cursor: pointer;
-  transition: var(--transition-fast);
+  transition: var(--transition-normal);
+  white-space: nowrap;
 }
 
-.send-btn:hover:not(:disabled) {
+.add-btn:hover:not(:disabled) {
   background: var(--accent-primary-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(74, 159, 212, 0.3);
 }
 
-.send-btn:disabled {
-  background: var(--text-muted);
+.add-btn:disabled {
+  opacity: 0.5;
   cursor: not-allowed;
 }
 
 /* 条目列表 */
-.inbox-list {
+.items-list {
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
@@ -255,7 +340,7 @@ onMounted(() => {
   justify-content: space-between;
   gap: var(--space-4);
   padding: var(--space-4);
-  background-color: var(--bg-card);
+  background: var(--bg-card);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-card);
   transition: var(--transition-normal);
@@ -263,6 +348,12 @@ onMounted(() => {
 
 .inbox-item:hover {
   box-shadow: var(--shadow-hover);
+  transform: translateY(-1px);
+}
+
+.inbox-item.is-processing {
+  opacity: 0.7;
+  pointer-events: none;
 }
 
 .item-content {
@@ -276,81 +367,149 @@ onMounted(() => {
 .item-text {
   font-size: var(--font-size-md);
   color: var(--text-primary);
-  line-height: var(--line-height-tight);
+  line-height: 1.5;
   word-break: break-word;
 }
 
-.item-time {
-  font-size: var(--font-size-xs);
+.item-date {
+  font-size: var(--font-size-sm);
   color: var(--text-muted);
-  letter-spacing: var(--letter-spacing-wide);
 }
 
-/* 操作按钮 - 始终显示 */
 .item-actions {
   display: flex;
-  align-items: center;
   gap: var(--space-2);
+  flex-shrink: 0;
 }
 
 .action-btn {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
   padding: var(--space-2) var(--space-3);
-  font-family: var(--font-family-base);
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-medium);
   border: none;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
   cursor: pointer;
   transition: var(--transition-normal);
-  letter-spacing: var(--letter-spacing-wide);
-  background-color: transparent;
 }
 
 .action-btn.convert {
+  background: var(--accent-primary-light);
   color: var(--accent-primary);
 }
 
-.action-btn.convert:hover {
-  background-color: var(--accent-primary-light);
+.action-btn.convert:hover:not(:disabled) {
+  background: var(--accent-primary);
+  color: white;
 }
 
 .action-btn.delete {
-  color: var(--accent-danger);
+  background: var(--bg-secondary);
+  color: var(--text-muted);
+  padding: var(--space-2);
 }
 
 .action-btn.delete:hover {
-  background-color: rgba(204, 139, 139, 0.1);
+  background: rgba(229, 115, 115, 0.15);
+  color: var(--accent-danger);
+}
+
+.action-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 /* 空状态 */
 .empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   text-align: center;
-  padding: var(--space-12) var(--space-6);
+  padding: var(--space-12);
   color: var(--text-muted);
-  font-size: var(--font-size-md);
-  letter-spacing: var(--letter-spacing-wide);
 }
 
-/* Toast */
-.toast {
+.empty-state h3 {
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+  margin: var(--space-4) 0 var(--space-2);
+}
+
+.empty-state p {
+  font-size: var(--font-size-md);
+  margin-bottom: var(--space-6);
+}
+
+.empty-tips {
+  display: flex;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.tip-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  background: var(--bg-secondary);
+  border-radius: var(--radius-full);
+  font-size: var(--font-size-sm);
+}
+
+/* 确认弹窗 */
+.confirm-content {
+  text-align: center;
+  padding: var(--space-4) 0;
+}
+
+.confirm-content p {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: var(--font-size-lg);
+}
+
+.confirm-hint {
+  margin-top: var(--space-2);
+  font-size: var(--font-size-sm);
+  color: var(--text-muted);
+}
+
+/* Toast 提示 */
+.error-toast,
+.success-toast {
   position: fixed;
   bottom: 80px;
   left: 50%;
   transform: translateX(-50%);
-  padding: var(--space-3) var(--space-5);
-  background-color: var(--text-primary);
-  color: var(--text-inverse);
-  border-radius: var(--radius-md);
-  font-size: var(--font-size-sm);
-  box-shadow: var(--shadow-float);
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-6);
+  border-radius: var(--radius-lg);
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-medium);
   z-index: var(--z-toast);
-  letter-spacing: var(--letter-spacing-wide);
+  box-shadow: var(--shadow-float);
+}
+
+.error-toast {
+  background: var(--accent-danger);
+  color: white;
+}
+
+.success-toast {
+  background: var(--accent-success);
+  color: white;
 }
 
 /* Toast 动画 */
 .toast-enter-active,
 .toast-leave-active {
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 0.3s ease;
 }
 
 .toast-enter-from,
@@ -359,37 +518,34 @@ onMounted(() => {
   transform: translateX(-50%) translateY(20px);
 }
 
-/* 响应式适配 */
+/* 响应式 */
 @media (max-width: 768px) {
-  .inbox-view {
-    padding: var(--space-5);
-  }
-
-  .inbox-container {
-    max-width: 100%;
-  }
-}
-
-@media (max-width: 480px) {
   .inbox-view {
     padding: var(--space-4);
   }
 
-  .inbox-title {
-    font-size: var(--font-size-xl);
+  .input-wrapper {
+    flex-direction: column;
   }
 
-  .inbox-input {
-    font-size: 16px;
+  .add-btn {
+    width: 100%;
+    justify-content: center;
   }
 
   .inbox-item {
-    padding: var(--space-3);
+    flex-direction: column;
+    align-items: flex-start;
   }
 
-  .action-btn {
-    padding: var(--space-1) var(--space-2);
-    font-size: 11px;
+  .item-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+
+  .empty-tips {
+    flex-direction: column;
+    align-items: center;
   }
 }
 </style>

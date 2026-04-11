@@ -4,10 +4,8 @@ import InboxView from '../views/InboxView.vue'
 import CalendarView from '../views/CalendarView.vue'
 import StatsView from '../views/StatsView.vue'
 import SettingsView from '../views/SettingsView.vue'
-import LinksView from '../views/LinksView.vue'
 import LoginView from '../views/LoginView.vue'
-import PoeticWriting from '../views/PoeticWriting.vue'
-import JournalView from '../views/JournalView.vue'
+import WechatNoteView from '../views/WechatNoteView.vue'
 
 // 角色专属页面
 import MakeupDashboard from '../views/roles/MakeupDashboard.vue'
@@ -18,13 +16,14 @@ import CSStudentDashboard from '../views/roles/CSStudentDashboard.vue'
 import CustomDashboard from '../views/roles/CustomDashboard.vue'
 
 const routes = [
-  // 默认模式路由
+  // 默认模式路由 - 简化为核心功能
   {
     path: '/',
     name: 'Today',
     component: TodayView,
     meta: {
       title: '今日',
+      icon: 'Home',
       roles: ['default']
     }
   },
@@ -34,6 +33,7 @@ const routes = [
     component: InboxView,
     meta: {
       title: '收集箱',
+      icon: 'Inbox',
       roles: ['default']
     }
   },
@@ -43,15 +43,17 @@ const routes = [
     component: CalendarView,
     meta: {
       title: '日历',
+      icon: 'Calendar',
       roles: ['default']
     }
   },
   {
-    path: '/links',
-    name: 'Links',
-    component: LinksView,
+    path: '/notes',
+    name: 'WechatNotes',
+    component: WechatNoteView,
     meta: {
-      title: '链接库',
+      title: '笔记',
+      icon: 'Note',
       roles: ['default']
     }
   },
@@ -61,17 +63,19 @@ const routes = [
     component: StatsView,
     meta: {
       title: '统计',
+      icon: 'Chart',
       roles: ['default']
     }
   },
 
-  // 化妆师模式路由
+  // 化妆师模式路由 - 简化为核心功能
   {
     path: '/',
     name: 'MakeupDashboard',
     component: MakeupDashboard,
     meta: {
       title: '工作台',
+      icon: 'Home',
       roles: ['makeup']
     }
   },
@@ -81,6 +85,7 @@ const routes = [
     component: () => import('../views/roles/makeup/Appointments.vue'),
     meta: {
       title: '预约',
+      icon: 'Calendar',
       roles: ['makeup']
     }
   },
@@ -90,35 +95,29 @@ const routes = [
     component: () => import('../views/roles/makeup/Clients.vue'),
     meta: {
       title: '客户',
+      icon: 'User',
       roles: ['makeup']
     }
   },
   {
-    path: '/makeup/schedule',
-    name: 'MakeupSchedule',
-    component: () => import('../views/roles/makeup/Schedule.vue'),
+    path: '/makeup/notes',
+    name: 'MakeupNotes',
+    component: WechatNoteView,
     meta: {
-      title: '排班',
-      roles: ['makeup']
-    }
-  },
-  {
-    path: '/makeup/income',
-    name: 'MakeupIncome',
-    component: () => import('../views/roles/makeup/Income.vue'),
-    meta: {
-      title: '收入',
+      title: '笔记',
+      icon: 'Note',
       roles: ['makeup']
     }
   },
 
-  // 学生模式路由
+  // 学生模式路由 - 简化为核心功能
   {
     path: '/',
     name: 'StudentDashboard',
     component: StudentDashboard,
     meta: {
       title: '首页',
+      icon: 'Home',
       roles: ['student']
     }
   },
@@ -128,6 +127,7 @@ const routes = [
     component: () => import('../views/roles/student/Schedule.vue'),
     meta: {
       title: '课程表',
+      icon: 'Calendar',
       roles: ['student']
     }
   },
@@ -137,35 +137,29 @@ const routes = [
     component: () => import('../views/roles/student/Homework.vue'),
     meta: {
       title: '作业',
+      icon: 'Task',
       roles: ['student']
     }
   },
   {
-    path: '/student/exams',
-    name: 'StudentExams',
-    component: () => import('../views/roles/student/Exams.vue'),
+    path: '/student/notes',
+    name: 'StudentNotes',
+    component: WechatNoteView,
     meta: {
-      title: '考试',
-      roles: ['student']
-    }
-  },
-  {
-    path: '/student/grades',
-    name: 'StudentGrades',
-    component: () => import('../views/roles/student/Grades.vue'),
-    meta: {
-      title: '成绩',
+      title: '笔记',
+      icon: 'Note',
       roles: ['student']
     }
   },
 
-  // 自习模式路由
+  // 自习模式路由 - 简化为核心功能
   {
     path: '/',
     name: 'StudyFocus',
     component: StudyFocus,
     meta: {
       title: '专注',
+      icon: 'Clock',
       roles: ['study']
     }
   },
@@ -175,26 +169,29 @@ const routes = [
     component: () => import('../views/roles/study/Stats.vue'),
     meta: {
       title: '统计',
+      icon: 'Chart',
       roles: ['study']
     }
   },
   {
-    path: '/study/room',
-    name: 'StudyRoom',
-    component: () => import('../views/roles/study/Room.vue'),
+    path: '/study/notes',
+    name: 'StudyNotes',
+    component: WechatNoteView,
     meta: {
-      title: '自习室',
+      title: '笔记',
+      icon: 'Note',
       roles: ['study']
     }
   },
 
-  // 店长模式路由
+  // 店长模式路由 - 简化为核心功能
   {
     path: '/',
     name: 'ManagerDashboard',
     component: ManagerDashboard,
     meta: {
       title: '概览',
+      icon: 'Home',
       roles: ['manager']
     }
   },
@@ -204,24 +201,7 @@ const routes = [
     component: () => import('../views/roles/manager/Staff.vue'),
     meta: {
       title: '员工',
-      roles: ['manager']
-    }
-  },
-  {
-    path: '/manager/inventory',
-    name: 'ManagerInventory',
-    component: () => import('../views/roles/manager/Inventory.vue'),
-    meta: {
-      title: '库存',
-      roles: ['manager']
-    }
-  },
-  {
-    path: '/manager/sales',
-    name: 'ManagerSales',
-    component: () => import('../views/roles/manager/Sales.vue'),
-    meta: {
-      title: '销售',
+      icon: 'User',
       roles: ['manager']
     }
   },
@@ -231,26 +211,29 @@ const routes = [
     component: () => import('../views/roles/manager/Tasks.vue'),
     meta: {
       title: '任务',
+      icon: 'Task',
       roles: ['manager']
     }
   },
   {
-    path: '/manager/boss-tasks',
-    name: 'ManagerBossTasks',
-    component: () => import('../views/roles/manager/BossTasks.vue'),
+    path: '/manager/notes',
+    name: 'ManagerNotes',
+    component: WechatNoteView,
     meta: {
-      title: '老板任务',
+      title: '笔记',
+      icon: 'Note',
       roles: ['manager']
     }
   },
 
-  // 计算机学生模式路由
+  // 计算机学生模式路由 - 简化为核心功能
   {
     path: '/',
     name: 'CSStudentDashboard',
     component: CSStudentDashboard,
     meta: {
       title: '项目',
+      icon: 'Code',
       roles: ['cs_student']
     }
   },
@@ -260,62 +243,39 @@ const routes = [
     component: () => import('../views/roles/cs_student/Learning.vue'),
     meta: {
       title: '学习',
-      roles: ['cs_student']
-    }
-  },
-  {
-    path: '/cs/github',
-    name: 'CSGithub',
-    component: () => import('../views/roles/cs_student/Github.vue'),
-    meta: {
-      title: 'GitHub',
-      roles: ['cs_student']
-    }
-  },
-  {
-    path: '/cs/leetcode',
-    name: 'CSLeetCode',
-    component: () => import('../views/roles/cs_student/LeetCode.vue'),
-    meta: {
-      title: '刷题',
+      icon: 'Book',
       roles: ['cs_student']
     }
   },
   {
     path: '/cs/notes',
     name: 'CSNotes',
-    component: () => import('../views/roles/cs_student/Notes.vue'),
+    component: WechatNoteView,
     meta: {
       title: '笔记',
+      icon: 'Note',
       roles: ['cs_student']
     }
   },
 
-  // 个人专属模式路由
+  // 个人专属模式路由 - 简化为核心功能
   {
     path: '/',
     name: 'CustomDashboard',
     component: CustomDashboard,
     meta: {
       title: '首页',
+      icon: 'Home',
       roles: ['custom']
     }
   },
   {
-    path: '/custom/widgets',
-    name: 'CustomWidgets',
-    component: () => import('../views/roles/custom/Widgets.vue'),
+    path: '/custom/notes',
+    name: 'CustomNotes',
+    component: WechatNoteView,
     meta: {
-      title: '组件',
-      roles: ['custom']
-    }
-  },
-  {
-    path: '/custom/layout',
-    name: 'CustomLayout',
-    component: () => import('../views/roles/custom/Layout.vue'),
-    meta: {
-      title: '布局',
+      title: '笔记',
+      icon: 'Note',
       roles: ['custom']
     }
   },
@@ -327,6 +287,7 @@ const routes = [
     component: SettingsView,
     meta: {
       title: '设置',
+      icon: 'Settings',
       roles: ['default', 'makeup', 'student', 'study', 'manager', 'cs_student', 'custom']
     }
   },
@@ -338,25 +299,8 @@ const routes = [
     component: LoginView,
     meta: {
       title: '登录',
+      icon: 'User',
       public: true
-    }
-  },
-  {
-    path: '/write',
-    name: 'PoeticWriting',
-    component: PoeticWriting,
-    meta: {
-      title: '诗意写作',
-      roles: ['default']
-    }
-  },
-  {
-    path: '/journal',
-    name: 'Journal',
-    component: JournalView,
-    meta: {
-      title: '今日手账',
-      roles: ['default']
     }
   }
 ]

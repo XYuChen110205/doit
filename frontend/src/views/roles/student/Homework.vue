@@ -2,30 +2,39 @@
   <div class="homework-page">
     <div class="page-header">
       <h1>作业管理</h1>
-      <button class="btn-primary" @click="showAddModal = true">+ 添加作业</button>
+      <BaseButton @click="showAddModal = true">
+        <SvgIcon name="Plus" :size="16" />
+        添加作业
+      </BaseButton>
     </div>
 
-    <!-- 统计卡片 -->
     <div class="stats-grid">
-      <div class="stat-card">
-        <div class="stat-value">{{ pendingCount }}</div>
-        <div class="stat-label">待完成</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-value">{{ todayCount }}</div>
-        <div class="stat-label">今日截止</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-value">{{ weekCount }}</div>
-        <div class="stat-label">本周截止</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-value">{{ completedCount }}</div>
-        <div class="stat-label">已完成</div>
-      </div>
+      <BaseCard>
+        <div class="stat-content">
+          <div class="stat-value">{{ pendingCount }}</div>
+          <div class="stat-label">待完成</div>
+        </div>
+      </BaseCard>
+      <BaseCard>
+        <div class="stat-content">
+          <div class="stat-value">{{ todayCount }}</div>
+          <div class="stat-label">今日截止</div>
+        </div>
+      </BaseCard>
+      <BaseCard>
+        <div class="stat-content">
+          <div class="stat-value">{{ weekCount }}</div>
+          <div class="stat-label">本周截止</div>
+        </div>
+      </BaseCard>
+      <BaseCard>
+        <div class="stat-content">
+          <div class="stat-value">{{ completedCount }}</div>
+          <div class="stat-label">已完成</div>
+        </div>
+      </BaseCard>
     </div>
 
-    <!-- 筛选标签 -->
     <div class="filter-bar">
       <button
         v-for="filter in filters"
@@ -38,100 +47,130 @@
       </button>
     </div>
 
-    <!-- 作业列表 -->
     <div class="homework-list">
-      <div
+      <BaseCard
         v-for="hw in filteredHomework"
         :key="hw.id"
-        class="homework-card"
-        :class="{ completed: hw.status === 'completed', urgent: isUrgent(hw) }"
+        hoverable
+        :border-color="getBorderColor(hw)"
+        :class="{ 'is-completed': hw.status === 'completed' }"
       >
         <div class="hw-header">
-          <div class="hw-subject" :style="{ backgroundColor: hw.color }">{{ hw.subject }}</div>
+          <div class="hw-subject" :style="{ backgroundColor: hw.color }">
+            {{ hw.subject }}
+          </div>
           <div class="hw-deadline" :class="{ overdue: isOverdue(hw) }">
             {{ formatDeadline(hw.deadline) }}
           </div>
         </div>
         <div class="hw-content">
           <h3 class="hw-title">{{ hw.title }}</h3>
-          <p class="hw-desc">{{ hw.description }}</p>
+          <p v-if="hw.description" class="hw-desc">{{ hw.description }}</p>
         </div>
         <div class="hw-footer">
           <div class="hw-meta">
             <span class="meta-item">{{ hw.type }}</span>
-            <span v-if="hw.grade" class="meta-item grade">成绩: {{ hw.grade }}</span>
+            <span v-if="hw.grade" class="meta-item grade">
+              {{ hw.grade }}
+            </span>
           </div>
           <div class="hw-actions">
-            <button
+            <BaseButton
               v-if="hw.status !== 'completed'"
-              class="btn-complete"
+              variant="primary"
+              size="sm"
               @click="completeHomework(hw.id)"
             >
+              <SvgIcon name="Check" :size="14" />
               完成
-            </button>
-            <button class="btn-edit" @click="editHomework(hw)">编辑</button>
-            <button class="btn-delete" @click="deleteHomework(hw.id)">删除</button>
+            </BaseButton>
+            <BaseButton variant="ghost" size="sm" @click="editHomework(hw)">
+              <SvgIcon name="Edit" :size="14" />
+            </BaseButton>
+            <BaseButton variant="danger" size="sm" @click="deleteHomework(hw.id)">
+              <SvgIcon name="Trash" :size="14" />
+            </BaseButton>
           </div>
         </div>
-      </div>
+      </BaseCard>
+
       <div v-if="filteredHomework.length === 0" class="empty-state">
-        暂无作业
+        <SvgIcon name="Task" :size="48" />
+        <p>暂无作业</p>
       </div>
     </div>
 
-    <!-- 添加/编辑作业弹窗 -->
-    <div v-if="showAddModal" class="modal-overlay" @click.self="closeModal">
-      <div class="modal">
-        <h3>{{ editingId ? '编辑作业' : '添加作业' }}</h3>
-        <form @submit.prevent="saveHomework">
+    <BaseModal v-model="showAddModal" :title="editingId ? '编辑作业' : '添加作业'">
+      <form @submit.prevent="saveHomework">
+        <BaseInput
+          v-model="form.title"
+          label="作业标题"
+          placeholder="输入作业标题"
+          required
+        />
+
+        <div class="form-row">
           <div class="form-group">
-            <label>作业标题</label>
-            <input v-model="form.title" type="text" required placeholder="输入作业标题" />
-          </div>
-          <div class="form-row">
-            <div class="form-group">
-              <label>科目</label>
-              <select v-model="form.subject" required>
-                <option v-for="subject in subjects" :key="subject.name" :value="subject.name">
-                  {{ subject.name }}
-                </option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label>类型</label>
-              <select v-model="form.type" required>
-                <option value="个人作业">个人作业</option>
-                <option value="小组作业">小组作业</option>
-                <option value="实验报告">实验报告</option>
-                <option value="论文">论文</option>
-                <option value="其他">其他</option>
-              </select>
-            </div>
+            <label class="input-label">科目</label>
+            <select v-model="form.subject" class="base-input">
+              <option v-for="subject in subjects" :key="subject.name" :value="subject.name">
+                {{ subject.name }}
+              </option>
+            </select>
           </div>
           <div class="form-group">
-            <label>截止时间</label>
-            <input v-model="form.deadline" type="datetime-local" required />
+            <label class="input-label">类型</label>
+            <select v-model="form.type" class="base-input">
+              <option value="个人作业">个人作业</option>
+              <option value="小组作业">小组作业</option>
+              <option value="实验报告">实验报告</option>
+              <option value="论文">论文</option>
+              <option value="其他">其他</option>
+            </select>
           </div>
-          <div class="form-group">
-            <label>作业描述</label>
-            <textarea v-model="form.description" rows="3" placeholder="作业要求、注意事项等..."></textarea>
-          </div>
-          <div class="form-group" v-if="editingId && form.status === 'completed'">
-            <label>成绩</label>
-            <input v-model="form.grade" type="text" placeholder="如：95分、A+" />
-          </div>
-          <div class="form-actions">
-            <button type="button" class="btn-secondary" @click="closeModal">取消</button>
-            <button type="submit" class="btn-primary">保存</button>
-          </div>
-        </form>
-      </div>
-    </div>
+        </div>
+
+        <BaseInput
+          v-model="form.deadline"
+          type="datetime-local"
+          label="截止时间"
+          required
+        />
+
+        <div class="form-group">
+          <label class="input-label">作业描述</label>
+          <textarea
+            v-model="form.description"
+            class="base-input textarea"
+            rows="3"
+            placeholder="作业要求、注意事项等..."
+          ></textarea>
+        </div>
+
+        <BaseInput
+          v-if="editingId && form.status === 'completed'"
+          v-model="form.grade"
+          label="成绩"
+          placeholder="如：95分、A+"
+        />
+
+        <div class="form-actions">
+          <BaseButton variant="secondary" type="button" @click="closeModal">
+            取消
+          </BaseButton>
+          <BaseButton type="submit">
+            保存
+          </BaseButton>
+        </div>
+      </form>
+    </BaseModal>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
+import { BaseButton, BaseCard, BaseInput, BaseModal } from '@/components/base'
+import SvgIcon from '@/components/icons/SvgIcon.vue'
 
 interface Homework {
   id: string
@@ -180,7 +219,6 @@ const form = ref({
   grade: ''
 })
 
-// 统计
 const pendingCount = computed(() => homework.value.filter(h => h.status === 'pending').length)
 const completedCount = computed(() => homework.value.filter(h => h.status === 'completed').length)
 
@@ -203,7 +241,6 @@ const weekCount = computed(() => {
   }).length
 })
 
-// 筛选
 const filteredHomework = computed(() => {
   let result = homework.value
 
@@ -229,13 +266,19 @@ const filteredHomework = computed(() => {
       break
   }
 
-  // 按截止时间排序
   return result.sort((a, b) => new Date(a.deadline).getTime() - new Date(b.deadline).getTime())
 })
 
 function getSubjectColor(subjectName: string): string {
   const subject = subjects.find(s => s.name === subjectName)
   return subject?.color || '#dfe6e9'
+}
+
+function getBorderColor(hw: Homework): string | undefined {
+  if (hw.status === 'completed') return undefined
+  if (isOverdue(hw)) return '#ff4757'
+  if (isUrgent(hw)) return '#ffa502'
+  return undefined
 }
 
 function isOverdue(hw: Homework): boolean {
@@ -340,51 +383,6 @@ function loadHomework() {
   const saved = localStorage.getItem('student_homework')
   if (saved) {
     homework.value = JSON.parse(saved)
-  } else {
-    // 初始化示例数据
-    const now = new Date()
-    const tomorrow = new Date(now)
-    tomorrow.setDate(tomorrow.getDate() + 1)
-    const threeDaysLater = new Date(now)
-    threeDaysLater.setDate(threeDaysLater.getDate() + 3)
-
-    homework.value = [
-      {
-        id: '1',
-        title: '微积分习题集第3章',
-        subject: '高等数学',
-        type: '个人作业',
-        description: '完成第3章所有习题，重点练习导数计算',
-        deadline: tomorrow.toISOString().slice(0, 16),
-        status: 'pending',
-        color: '#ff6b6b',
-        createdAt: now.toISOString()
-      },
-      {
-        id: '2',
-        title: '英语阅读理解',
-        subject: '大学英语',
-        type: '个人作业',
-        description: '阅读Unit 4文章并完成课后练习',
-        deadline: threeDaysLater.toISOString().slice(0, 16),
-        status: 'pending',
-        color: '#4ecdc4',
-        createdAt: now.toISOString()
-      },
-      {
-        id: '3',
-        title: 'Python程序设计实验',
-        subject: '程序设计',
-        type: '实验报告',
-        description: '完成实验3：函数与模块',
-        deadline: now.toISOString().slice(0, 16),
-        status: 'completed',
-        grade: '95分',
-        color: '#fd79a8',
-        createdAt: now.toISOString()
-      }
-    ]
-    localStorage.setItem('student_homework', JSON.stringify(homework.value))
   }
 }
 
@@ -412,17 +410,6 @@ onMounted(() => {
   color: var(--text-primary);
 }
 
-.btn-primary {
-  background: var(--accent-primary);
-  color: white;
-  border: none;
-  padding: var(--space-3) var(--space-4);
-  border-radius: var(--radius-lg);
-  cursor: pointer;
-  font-weight: var(--font-weight-medium);
-}
-
-/* 统计卡片 */
 .stats-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -430,12 +417,8 @@ onMounted(() => {
   margin-bottom: var(--space-6);
 }
 
-.stat-card {
-  background: var(--bg-card);
-  border-radius: var(--radius-xl);
-  padding: var(--space-5);
+.stat-content {
   text-align: center;
-  box-shadow: var(--shadow-card);
 }
 
 .stat-value {
@@ -450,7 +433,6 @@ onMounted(() => {
   color: var(--text-secondary);
 }
 
-/* 筛选栏 */
 .filter-bar {
   display: flex;
   gap: var(--space-2);
@@ -474,36 +456,19 @@ onMounted(() => {
   border-color: var(--accent-primary);
 }
 
-/* 作业列表 */
 .homework-list {
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
 }
 
-.homework-card {
-  background: var(--bg-card);
-  border-radius: var(--radius-xl);
-  padding: var(--space-4);
-  box-shadow: var(--shadow-card);
-  transition: var(--transition-normal);
-}
-
-.homework-card:hover {
-  box-shadow: var(--shadow-hover);
-}
-
-.homework-card.completed {
+.is-completed {
   opacity: 0.7;
 }
 
-.homework-card.completed .hw-title {
+.is-completed .hw-title {
   text-decoration: line-through;
   color: var(--text-muted);
-}
-
-.homework-card.urgent {
-  border-left: 4px solid #ff4757;
 }
 
 .hw-header {
@@ -538,13 +503,14 @@ onMounted(() => {
 .hw-title {
   font-size: var(--font-size-lg);
   color: var(--text-primary);
-  margin-bottom: var(--space-2);
+  margin: 0 0 var(--space-2);
 }
 
 .hw-desc {
   font-size: var(--font-size-sm);
   color: var(--text-secondary);
   line-height: 1.5;
+  margin: 0;
 }
 
 .hw-footer {
@@ -578,75 +544,39 @@ onMounted(() => {
   gap: var(--space-2);
 }
 
-.hw-actions button {
-  padding: var(--space-2) var(--space-3);
-  border: none;
-  border-radius: var(--radius-md);
-  font-size: var(--font-size-sm);
-  cursor: pointer;
-  transition: var(--transition-normal);
-}
-
-.btn-complete {
-  background: #d1fae5;
-  color: #065f46;
-}
-
-.btn-edit {
-  background: var(--bg-secondary);
-  color: var(--text-secondary);
-}
-
-.btn-delete {
-  background: #fee2e2;
-  color: #dc2626;
-}
-
 .empty-state {
   text-align: center;
   padding: var(--space-8);
   color: var(--text-muted);
-}
-
-/* 弹窗 */
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.5);
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: center;
-  z-index: var(--z-modal);
-  padding: var(--space-4);
+  gap: var(--space-3);
 }
 
-.modal {
-  background: var(--bg-primary);
-  border-radius: var(--radius-xl);
-  padding: var(--space-6);
-  width: 100%;
-  max-width: 500px;
+.empty-state p {
+  margin: 0;
 }
 
-.modal h3 {
-  margin-bottom: var(--space-4);
-  color: var(--text-primary);
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-3);
 }
 
 .form-group {
   margin-bottom: var(--space-3);
 }
 
-.form-group label {
+.input-label {
   display: block;
   margin-bottom: var(--space-2);
   font-size: var(--font-size-sm);
   color: var(--text-secondary);
+  font-weight: var(--font-weight-medium);
 }
 
-.form-group input,
-.form-group select,
-.form-group textarea {
+.base-input {
   width: 100%;
   padding: var(--space-3);
   border: 1px solid var(--border);
@@ -656,10 +586,14 @@ onMounted(() => {
   font-size: var(--font-size-base);
 }
 
-.form-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--space-3);
+.base-input:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+}
+
+.textarea {
+  resize: vertical;
+  min-height: 80px;
 }
 
 .form-actions {
@@ -669,16 +603,6 @@ onMounted(() => {
   margin-top: var(--space-4);
 }
 
-.btn-secondary {
-  padding: var(--space-3) var(--space-4);
-  border: 1px solid var(--border);
-  background: transparent;
-  color: var(--text-primary);
-  border-radius: var(--radius-md);
-  cursor: pointer;
-}
-
-/* 响应式 */
 @media (max-width: 768px) {
   .stats-grid {
     grid-template-columns: repeat(2, 1fr);

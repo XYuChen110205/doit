@@ -4,7 +4,7 @@
     <nav class="navbar">
       <div class="nav-container">
         <div class="nav-brand">
-          <span class="brand-icon">✦</span>
+          <SvgIcon :name="currentRoleInfo.iconName" :size="20" class="brand-icon" />
           <span class="brand-text">{{ currentRoleInfo.name }}</span>
         </div>
         <div class="nav-right">
@@ -16,17 +16,42 @@
               class="nav-link"
               :class="{ active: $route.path === route.path }"
             >
+              <SvgIcon v-if="route.meta?.icon" :name="route.meta.icon" :size="16" />
               {{ route.meta?.title }}
             </router-link>
           </div>
           <!-- 主题切换按钮 -->
           <ThemeSwitcher />
+          <!-- 角色切换 -->
+          <div class="role-switcher">
+            <button class="role-btn" @click="showRoleMenu = !showRoleMenu">
+              <SvgIcon :name="currentRoleInfo.iconName" :size="16" />
+            </button>
+            <div v-if="showRoleMenu" class="role-menu">
+              <button
+                v-for="(info, key) in roleInfo"
+                :key="key"
+                class="role-option"
+                :class="{ active: currentRole === key }"
+                @click="switchRole(key)"
+              >
+                <SvgIcon :name="info.iconName" :size="16" />
+                <span>{{ info.name }}</span>
+              </button>
+            </div>
+          </div>
           <!-- 用户信息 -->
           <div v-if="userStore.isLoggedIn" class="user-menu">
+            <SvgIcon name="User" :size="16" />
             <span class="username">{{ userStore.username }}</span>
-            <button class="logout-btn" @click="handleLogout">退出</button>
+            <button class="logout-btn" @click="handleLogout">
+              <SvgIcon name="Logout" :size="14" />
+            </button>
           </div>
-          <router-link v-else to="/login" class="login-link">登录</router-link>
+          <router-link v-else to="/login" class="login-link">
+            <SvgIcon name="User" :size="16" />
+            登录
+          </router-link>
         </div>
       </div>
     </nav>
@@ -41,23 +66,25 @@
     <!-- 移动端底部导航栏 -->
     <nav class="navbar-mobile">
       <router-link
-        v-for="route in currentRoutes"
+        v-for="route in currentRoutes.slice(0, 5)"
         :key="route.path"
         :to="route.path"
         class="nav-link-mobile"
         :class="{ active: $route.path === route.path }"
       >
-        {{ route.meta?.title }}
+        <SvgIcon v-if="route.meta?.icon" :name="route.meta.icon" :size="20" />
+        <span>{{ route.meta?.title }}</span>
       </router-link>
     </nav>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import router from './router'
 import ThemeSwitcher from './components/ThemeSwitcher.vue'
+import SvgIcon from './components/icons/SvgIcon.vue'
 import { initTheme } from './styles/themes'
 import { useUserStore } from './stores/user'
 
@@ -67,16 +94,17 @@ const userStore = useUserStore()
 
 // 当前角色
 const currentRole = ref('default')
+const showRoleMenu = ref(false)
 
-// 角色信息
-const roleInfo: Record<string, { name: string; icon: string }> = {
-  default: { name: 'Do It', icon: '✦' },
-  makeup: { name: '化妆师助手', icon: '💄' },
-  student: { name: '学习助手', icon: '📚' },
-  study: { name: '专注自习', icon: '🧘' },
-  manager: { name: '店长助手', icon: '🏪' },
-  cs_student: { name: '编程助手', icon: '💻' },
-  custom: { name: '个人专属', icon: '⭐' }
+// 角色信息 - 使用 SVG 图标替代 emoji
+const roleInfo: Record<string, { name: string; iconName: string }> = {
+  default: { name: 'Do It', iconName: 'Sparkle' },
+  makeup: { name: '化妆师助手', iconName: 'Makeup' },
+  student: { name: '学习助手', iconName: 'Student' },
+  study: { name: '专注自习', iconName: 'Study' },
+  manager: { name: '店长助手', iconName: 'Manager' },
+  cs_student: { name: '编程助手', iconName: 'Code' },
+  custom: { name: '个人专属', iconName: 'Custom' }
 }
 
 // 当前角色信息
@@ -103,16 +131,38 @@ const currentRoutes = computed(() => {
 // 加载角色
 function loadRole() {
   const savedRole = localStorage.getItem('userRole')
-  if (savedRole) {
+  if (savedRole && roleInfo[savedRole]) {
     currentRole.value = savedRole
+  }
+}
+
+// 切换角色
+function switchRole(role: string) {
+  currentRole.value = role
+  localStorage.setItem('userRole', role)
+  showRoleMenu.value = false
+  // 切换到对应角色的首页
+  $router.push('/')
+}
+
+// 点击外部关闭角色菜单
+function handleClickOutside(event: MouseEvent) {
+  const target = event.target as HTMLElement
+  if (!target.closest('.role-switcher')) {
+    showRoleMenu.value = false
   }
 }
 
 // 初始化
 onMounted(() => {
   loadRole()
-  initTheme() // 初始化主题
-  userStore.init() // 初始化用户状态
+  initTheme()
+  userStore.init()
+  document.addEventListener('click', handleClickOutside)
+})
+
+onUnmounted(() => {
+  document.removeEventListener('click', handleClickOutside)
 })
 
 // 退出登录
@@ -123,7 +173,6 @@ function handleLogout() {
 </script>
 
 <style>
-/* 全局样式引入 */
 @import './styles/tokens.css';
 </style>
 
@@ -170,7 +219,6 @@ function handleLogout() {
 }
 
 .brand-icon {
-  font-size: var(--font-size-lg);
   color: var(--accent-primary);
 }
 
@@ -194,7 +242,10 @@ function handleLogout() {
 
 .nav-link {
   position: relative;
-  padding: var(--space-3) var(--space-5);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
   font-size: var(--font-size-md);
   font-weight: var(--font-weight-medium);
   letter-spacing: var(--letter-spacing-normal);
@@ -214,13 +265,79 @@ function handleLogout() {
   background: var(--accent-primary-light);
 }
 
+/* 角色切换器 */
+.role-switcher {
+  position: relative;
+}
+
+.role-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: var(--transition-normal);
+}
+
+.role-btn:hover {
+  background: var(--bg-hover);
+  color: var(--accent-primary);
+}
+
+.role-menu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: var(--space-2);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-float);
+  padding: var(--space-2);
+  min-width: 160px;
+  z-index: var(--z-dropdown);
+}
+
+.role-option {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  padding: var(--space-3) var(--space-4);
+  background: none;
+  border: none;
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: var(--transition-normal);
+  text-align: left;
+}
+
+.role-option:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.role-option.active {
+  background: var(--accent-primary-light);
+  color: var(--accent-primary);
+}
+
 /* 用户菜单 */
 .user-menu {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
+  gap: var(--space-2);
   padding-left: var(--space-4);
   border-left: 1px solid var(--border-light);
+  color: var(--text-secondary);
 }
 
 .username {
@@ -230,11 +347,15 @@ function handleLogout() {
 }
 
 .logout-btn {
-  padding: var(--space-2) var(--space-3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
   background: var(--bg-secondary);
   border: none;
   border-radius: var(--radius-md);
-  font-size: var(--font-size-sm);
   color: var(--text-secondary);
   cursor: pointer;
   transition: var(--transition-normal);
@@ -246,6 +367,9 @@ function handleLogout() {
 }
 
 .login-link {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
   padding: var(--space-2) var(--space-4);
   background: var(--accent-primary);
   color: white;
@@ -295,6 +419,7 @@ function handleLogout() {
   flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: var(--space-1);
   padding: var(--space-2) var(--space-1);
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-medium);

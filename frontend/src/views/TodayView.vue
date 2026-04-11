@@ -1,5 +1,13 @@
 <template>
   <div class="today-view">
+    <!-- 加载状态 -->
+    <div v-if="isLoading" class="loading-overlay">
+      <div class="loading-content">
+        <SvgIcon name="Loading" :size="32" />
+        <span>加载中...</span>
+      </div>
+    </div>
+
     <!-- 左栏：任务列表 -->
     <div class="tasks-section">
       <!-- 日期导航 -->
@@ -60,7 +68,8 @@
               {{ tag.name }}
             </button>
             <router-link v-if="allTags.length === 0" to="/tags" class="create-tag-link">
-              + 创建标签
+              <SvgIcon name="Plus" :size="14" />
+              创建标签
             </router-link>
           </div>
         </div>
@@ -80,6 +89,7 @@
               :disabled="!canCreate"
               @click="createTask"
             >
+              <SvgIcon name="Plus" :size="16" />
               添加
             </button>
           </div>
@@ -116,16 +126,15 @@
                 </div>
                 <span class="task-title">{{ task.title }}</span>
               </div>
-              <button class="delete-btn" @click="deleteTask(task.id)" title="删除">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
-                </svg>
+              <button class="delete-btn" @click="confirmDeleteTask(task.id)" title="删除">
+                <SvgIcon name="Trash" :size="16" />
               </button>
             </div>
           </div>
           <div v-if="filteredPendingTasks.length === 0" class="empty-state">
-            <div class="empty-icon">📝</div>
+            <SvgIcon name="Task" :size="48" />
             <div class="empty-text">{{ filterTagId ? '该标签下暂无任务' : '暂无任务，添加一个吧' }}</div>
+            <div class="empty-hint">选择上方标签，输入任务内容开始添加</div>
           </div>
         </div>
 
@@ -158,10 +167,8 @@
                   </div>
                   <span class="task-title">{{ task.title }}</span>
                 </div>
-                <button class="delete-btn" @click="deleteTask(task.id)" title="删除">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
-                  </svg>
+                <button class="delete-btn" @click="confirmDeleteTask(task.id)" title="删除">
+                  <SvgIcon name="Trash" :size="16" />
                 </button>
               </div>
             </div>
@@ -174,12 +181,19 @@
     <div class="notes-section">
       <div class="notes-card">
         <div class="notes-header">
-          <h2 class="notes-title">📝 今日笔记</h2>
+          <h2 class="notes-title">
+            <SvgIcon name="Document" :size="20" />
+            今日笔记
+          </h2>
           <div class="save-status">
             <span v-if="saveStatus === 'saving'" class="status-saving">
-              <span class="spinner"></span>保存中...
+              <SvgIcon name="Loading" :size="14" />
+              保存中...
             </span>
-            <span v-else-if="saveStatus === 'saved'" class="status-saved">✓ 已保存</span>
+            <span v-else-if="saveStatus === 'saved'" class="status-saved">
+              <SvgIcon name="Check" :size="14" />
+              已保存
+            </span>
             <span v-else class="status-idle">自动保存</span>
           </div>
         </div>
@@ -196,10 +210,31 @@
     <!-- Undo Toast -->
     <Transition name="toast">
       <div v-if="deletedTask" class="undo-toast">
-        <span>✓ 任务已删除</span>
+        <SvgIcon name="Check" :size="16" />
+        <span>任务已删除</span>
         <button class="undo-btn" @click="undoDelete">撤销</button>
       </div>
     </Transition>
+
+    <!-- 错误提示 Toast -->
+    <Transition name="toast">
+      <div v-if="errorMessage" class="error-toast">
+        <SvgIcon name="Alert" :size="16" />
+        <span>{{ errorMessage }}</span>
+      </div>
+    </Transition>
+
+    <!-- 删除确认弹窗 -->
+    <BaseModal v-model="showDeleteConfirm" title="确认删除">
+      <div class="confirm-content">
+        <p>确定要删除这个任务吗？</p>
+        <p class="confirm-hint">删除后可以在 5 秒内撤销</p>
+      </div>
+      <template #footer>
+        <BaseButton variant="secondary" @click="showDeleteConfirm = false">取消</BaseButton>
+        <BaseButton variant="danger" @click="executeDelete">删除</BaseButton>
+      </template>
+    </BaseModal>
   </div>
 </template>
 
@@ -210,6 +245,9 @@ import { createTask as apiCreateTask, getTasksByDate, updateTask, deleteTask as 
 import { getNoteByDate, saveNote as apiSaveNote } from '../api/notes'
 import { listTags } from '../api/tags'
 import { addTagToTask } from '../api/task_tags'
+import SvgIcon from '../components/icons/SvgIcon.vue'
+import BaseModal from '../components/base/BaseModal.vue'
+import BaseButton from '../components/base/BaseButton.vue'
 
 // 当前日期
 const currentDate = ref(new Date())
@@ -229,6 +267,15 @@ const noteContent = ref('')
 const saveStatus = ref<'idle' | 'saving' | 'saved'>('idle')
 let saveTimer: ReturnType<typeof setTimeout> | null = null
 let autoSaveTimer: ReturnType<typeof setTimeout> | null = null
+
+// 加载和错误状态
+const isLoading = ref(false)
+const errorMessage = ref('')
+let errorTimer: ReturnType<typeof setTimeout> | null = null
+
+// 删除确认
+const showDeleteConfirm = ref(false)
+const taskToDelete = ref<number | null>(null)
 
 // 计算属性：格式化日期
 const formattedDate = computed(() => {
@@ -265,12 +312,22 @@ const filteredCompletedTasks = computed(() => {
   return result
 })
 
+// 显示错误提示
+function showError(message: string) {
+  errorMessage.value = message
+  if (errorTimer) clearTimeout(errorTimer)
+  errorTimer = setTimeout(() => {
+    errorMessage.value = ''
+  }, 3000)
+}
+
 // 加载标签
 async function loadTags() {
   try {
     allTags.value = await listTags()
   } catch (error) {
     console.error('加载标签失败:', error)
+    showError('加载标签失败，请刷新页面重试')
   }
 }
 
@@ -280,6 +337,7 @@ async function loadTasks() {
     tasks.value = await getTasksByDate(dateString.value)
   } catch (error) {
     console.error('加载任务失败:', error)
+    showError('加载任务失败，请检查网络连接')
   }
 }
 
@@ -291,6 +349,17 @@ async function loadNote() {
     saveStatus.value = 'idle'
   } catch (error) {
     console.error('加载笔记失败:', error)
+    showError('加载笔记失败')
+  }
+}
+
+// 初始化加载
+async function initLoad() {
+  isLoading.value = true
+  try {
+    await Promise.all([loadTags(), loadTasks(), loadNote()])
+  } finally {
+    isLoading.value = false
   }
 }
 
@@ -323,6 +392,7 @@ async function createTask() {
     await loadTasks()
   } catch (error) {
     console.error('创建任务失败:', error)
+    showError('创建任务失败，请重试')
   }
 }
 
@@ -334,11 +404,22 @@ async function toggleTaskStatus(task: Task) {
     await loadTasks()
   } catch (error) {
     console.error('更新任务失败:', error)
+    showError('更新任务失败')
   }
 }
 
-// 删除任务
-async function deleteTask(id: number) {
+// 确认删除任务
+function confirmDeleteTask(id: number) {
+  taskToDelete.value = id
+  showDeleteConfirm.value = true
+}
+
+// 执行删除
+async function executeDelete() {
+  if (!taskToDelete.value) return
+  
+  showDeleteConfirm.value = false
+  const id = taskToDelete.value
   const task = tasks.value.find(t => t.id === id)
   if (!task) return
 
@@ -353,7 +434,9 @@ async function deleteTask(id: number) {
     }, 5000)
   } catch (error) {
     console.error('删除任务失败:', error)
+    showError('删除任务失败')
   }
+  taskToDelete.value = null
 }
 
 // 撤销删除
@@ -383,6 +466,7 @@ async function undoDelete() {
     await loadTasks()
   } catch (error) {
     console.error('撤销删除失败:', error)
+    showError('撤销删除失败')
   }
 }
 
@@ -411,6 +495,7 @@ async function saveNote() {
   } catch (error) {
     console.error('保存笔记失败:', error)
     saveStatus.value = 'idle'
+    showError('保存笔记失败')
   }
 }
 
@@ -422,9 +507,7 @@ watch(currentDate, () => {
 
 // 初始化
 onMounted(() => {
-  loadTags()
-  loadTasks()
-  loadNote()
+  initLoad()
 })
 </script>
 
@@ -434,6 +517,26 @@ onMounted(() => {
   gap: var(--space-6);
   min-height: calc(100vh - 64px - var(--space-6) * 2);
   padding: var(--space-6);
+  position: relative;
+}
+
+/* 加载遮罩 */
+.loading-overlay {
+  position: absolute;
+  inset: 0;
+  background: var(--bg-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: var(--z-modal);
+}
+
+.loading-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  color: var(--text-secondary);
 }
 
 /* ========== 左栏：任务列表 ========== */
@@ -611,6 +714,9 @@ onMounted(() => {
 }
 
 .create-tag-link {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
   padding: var(--space-2) var(--space-4);
   color: var(--accent-primary);
   text-decoration: none;
@@ -661,6 +767,9 @@ onMounted(() => {
 }
 
 .add-btn {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
   padding: var(--space-3) var(--space-6);
   background: var(--accent-primary);
   color: white;
@@ -670,13 +779,13 @@ onMounted(() => {
   font-size: var(--font-size-base);
   font-weight: var(--font-weight-medium);
   transition: var(--transition-normal);
-  min-width: 80px;
+  min-width: 100px;
 }
 
 .add-btn:hover:not(:disabled) {
-  background: var(--accent-secondary);
+  background: var(--accent-primary-hover);
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+  box-shadow: 0 4px 12px rgba(74, 159, 212, 0.3);
 }
 
 .add-btn:disabled {
@@ -720,18 +829,23 @@ onMounted(() => {
 }
 
 .empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
   text-align: center;
   padding: var(--space-10);
   color: var(--text-muted);
 }
 
-.empty-icon {
-  font-size: 48px;
-  margin-bottom: var(--space-4);
-}
-
 .empty-text {
   font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-medium);
+}
+
+.empty-hint {
+  font-size: var(--font-size-sm);
+  opacity: 0.8;
 }
 
 .task-item {
@@ -846,7 +960,7 @@ onMounted(() => {
 
 .delete-btn:hover {
   color: var(--accent-danger);
-  background: rgba(204, 139, 139, 0.15);
+  background: rgba(229, 115, 115, 0.15);
 }
 
 /* 已完成任务折叠 */
@@ -912,6 +1026,9 @@ onMounted(() => {
 }
 
 .notes-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
   font-size: var(--font-size-xl);
   font-weight: var(--font-weight-bold);
   color: var(--text-primary);
@@ -929,7 +1046,7 @@ onMounted(() => {
   font-size: var(--font-size-sm);
   display: flex;
   align-items: center;
-  gap: var(--space-2);
+  gap: var(--space-1);
 }
 
 .status-saving {
@@ -943,21 +1060,6 @@ onMounted(() => {
 
 .status-idle {
   color: var(--text-muted);
-}
-
-.spinner {
-  width: 14px;
-  height: 14px;
-  border: 2px solid var(--border);
-  border-top-color: var(--accent-primary);
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
 }
 
 .notes-textarea {
@@ -993,7 +1095,7 @@ onMounted(() => {
   transform: translateX(-50%);
   display: flex;
   align-items: center;
-  gap: var(--space-4);
+  gap: var(--space-3);
   padding: var(--space-4) var(--space-6);
   background: var(--text-primary);
   color: white;
@@ -1021,6 +1123,25 @@ onMounted(() => {
   color: white;
 }
 
+/* ========== Error Toast ========== */
+.error-toast {
+  position: fixed;
+  bottom: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-6);
+  background: var(--accent-danger);
+  color: white;
+  border-radius: var(--radius-lg);
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-medium);
+  z-index: var(--z-toast);
+  box-shadow: var(--shadow-float);
+}
+
 /* Toast 动画 */
 .toast-enter-active,
 .toast-leave-active {
@@ -1031,6 +1152,24 @@ onMounted(() => {
 .toast-leave-to {
   opacity: 0;
   transform: translateX(-50%) translateY(20px);
+}
+
+/* ========== 确认弹窗 ========== */
+.confirm-content {
+  text-align: center;
+  padding: var(--space-4) 0;
+}
+
+.confirm-content p {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: var(--font-size-lg);
+}
+
+.confirm-hint {
+  margin-top: var(--space-2);
+  font-size: var(--font-size-sm);
+  color: var(--text-muted);
 }
 
 /* ========== 响应式适配 ========== */
@@ -1076,6 +1215,7 @@ onMounted(() => {
   .add-btn {
     width: 100%;
     padding: var(--space-3);
+    justify-content: center;
   }
 
   .tag-filter-bar {

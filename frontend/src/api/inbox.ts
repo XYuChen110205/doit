@@ -121,6 +121,9 @@ export async function deleteInboxItem(id: string): Promise<void> {
   return deleteInbox(id)
 }
 
+// 别名导出，兼容旧代码
+export { listInbox as listInboxItems }
+
 export async function convertToTask(inboxId: string, taskData?: { title?: string; detail?: string; priority?: number }): Promise<void> {
   const userId = await getCurrentUserId()
   

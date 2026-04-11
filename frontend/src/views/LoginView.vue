@@ -2,7 +2,7 @@
   <div class="login-view">
     <div class="login-container">
       <div class="login-header">
-        <span class="logo">✦</span>
+        <SvgIcon name="Sparkle" :size="48" class="logo" />
         <h1>Do It</h1>
         <p>个人任务管理系统</p>
       </div>
@@ -37,14 +37,24 @@
         </div>
         <div class="form-group">
           <label>密码</label>
-          <input 
-            v-model="loginForm.password" 
-            type="password" 
-            placeholder="请输入密码"
-            required
-          />
+          <div class="password-input">
+            <input 
+              v-model="loginForm.password" 
+              :type="showPassword ? 'text' : 'password'" 
+              placeholder="请输入密码"
+              required
+            />
+            <button 
+              type="button" 
+              class="toggle-password"
+              @click="showPassword = !showPassword"
+            >
+              <SvgIcon :name="showPassword ? 'EyeOff' : 'Eye'" :size="18" />
+            </button>
+          </div>
         </div>
         <div v-if="userStore.error" class="error-message">
+          <SvgIcon name="Alert" :size="16" />
           {{ userStore.error }}
         </div>
         <button 
@@ -52,6 +62,7 @@
           class="submit-btn"
           :disabled="userStore.isLoading"
         >
+          <SvgIcon v-if="userStore.isLoading" name="Loading" :size="16" />
           {{ userStore.isLoading ? '登录中...' : '登录' }}
         </button>
       </form>
@@ -78,50 +89,86 @@
         </div>
         <div class="form-group">
           <label>密码</label>
-          <input 
-            v-model="registerForm.password" 
-            type="password" 
-            placeholder="请输入密码（至少6位）"
-            required
-            minlength="6"
-          />
+          <div class="password-input">
+            <input 
+              v-model="registerForm.password" 
+              :type="showPassword ? 'text' : 'password'" 
+              placeholder="请输入密码（至少6位）"
+              required
+              minlength="6"
+              @input="validatePassword"
+            />
+            <button 
+              type="button" 
+              class="toggle-password"
+              @click="showPassword = !showPassword"
+            >
+              <SvgIcon :name="showPassword ? 'EyeOff' : 'Eye'" :size="18" />
+            </button>
+          </div>
+          <div class="password-strength" v-if="registerForm.password">
+            <div class="strength-bar">
+              <div 
+                class="strength-fill" 
+                :class="passwordStrength"
+                :style="{ width: passwordStrengthWidth }"
+              ></div>
+            </div>
+            <span class="strength-text">{{ passwordStrengthText }}</span>
+          </div>
         </div>
         <div class="form-group">
           <label>确认密码</label>
-          <input 
-            v-model="registerForm.confirmPassword" 
-            type="password" 
-            placeholder="请再次输入密码"
-            required
-          />
+          <div class="password-input">
+            <input 
+              v-model="registerForm.confirmPassword" 
+              :type="showConfirmPassword ? 'text' : 'password'" 
+              placeholder="请再次输入密码"
+              required
+            />
+            <button 
+              type="button" 
+              class="toggle-password"
+              @click="showConfirmPassword = !showConfirmPassword"
+            >
+              <SvgIcon :name="showConfirmPassword ? 'EyeOff' : 'Eye'" :size="18" />
+            </button>
+          </div>
+          <div v-if="passwordMatchError" class="field-error">
+            <SvgIcon name="Alert" :size="14" />
+            {{ passwordMatchError }}
+          </div>
         </div>
         <div v-if="passwordError" class="error-message">
+          <SvgIcon name="Alert" :size="16" />
           {{ passwordError }}
         </div>
         <div v-else-if="userStore.error" class="error-message">
+          <SvgIcon name="Alert" :size="16" />
           {{ userStore.error }}
         </div>
         <button 
           type="submit" 
           class="submit-btn"
-          :disabled="userStore.isLoading"
+          :disabled="userStore.isLoading || !isFormValid"
         >
+          <SvgIcon v-if="userStore.isLoading" name="Loading" :size="16" />
           {{ userStore.isLoading ? '注册中...' : '注册' }}
         </button>
       </form>
 
       <!-- 测试登录按钮 -->
-      <div class="test-login-section" style="margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--border-color);">
+      <div class="test-login-section">
         <button 
           type="button" 
-          class="submit-btn"
-          style="background: var(--bg-secondary); color: var(--text-secondary);"
+          class="test-btn"
           @click="handleTestLogin"
           :disabled="userStore.isLoading"
         >
+          <SvgIcon name="User" :size="16" />
           测试登录（免注册）
         </button>
-        <p style="font-size: 12px; color: var(--text-tertiary); margin-top: 8px; text-align: center;">
+        <p class="test-hint">
           使用测试账号直接登录，数据仅保存在当前设备
         </p>
       </div>
@@ -134,15 +181,19 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive } from 'vue'
+import { ref, reactive, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '../stores/user'
+import SvgIcon from '../components/icons/SvgIcon.vue'
 
 const router = useRouter()
 const userStore = useUserStore()
 
 const isLogin = ref(true)
 const passwordError = ref('')
+const passwordMatchError = ref('')
+const showPassword = ref(false)
+const showConfirmPassword = ref(false)
 
 const loginForm = reactive({
   email: '',
@@ -155,6 +206,46 @@ const registerForm = reactive({
   password: '',
   confirmPassword: ''
 })
+
+// 密码强度计算
+const passwordStrength = computed(() => {
+  const pwd = registerForm.password
+  if (!pwd) return ''
+  if (pwd.length < 6) return 'weak'
+  if (pwd.length < 10 || !/[A-Za-z]/.test(pwd) || !/[0-9]/.test(pwd)) return 'medium'
+  return 'strong'
+})
+
+const passwordStrengthWidth = computed(() => {
+  const strength = passwordStrength.value
+  if (strength === 'weak') return '33%'
+  if (strength === 'medium') return '66%'
+  if (strength === 'strong') return '100%'
+  return '0%'
+})
+
+const passwordStrengthText = computed(() => {
+  const strength = passwordStrength.value
+  if (strength === 'weak') return '密码强度：弱'
+  if (strength === 'medium') return '密码强度：中'
+  if (strength === 'strong') return '密码强度：强'
+  return ''
+})
+
+// 表单验证
+const isFormValid = computed(() => {
+  if (!registerForm.username || !registerForm.email || !registerForm.password) return false
+  if (registerForm.password !== registerForm.confirmPassword) return false
+  if (registerForm.password.length < 6) return false
+  return true
+})
+
+function validatePassword() {
+  passwordMatchError.value = ''
+  if (registerForm.confirmPassword && registerForm.password !== registerForm.confirmPassword) {
+    passwordMatchError.value = '两次输入的密码不一致'
+  }
+}
 
 async function handleLogin() {
   const success = await userStore.login({
@@ -248,8 +339,7 @@ async function handleTestLogin() {
 }
 
 .logo {
-  font-size: 48px;
-  display: block;
+  color: var(--accent-primary);
   margin-bottom: var(--space-3);
 }
 
@@ -310,6 +400,35 @@ async function handleTestLogin() {
   color: var(--text-secondary);
 }
 
+.password-input {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.password-input input {
+  width: 100%;
+  padding-right: 40px;
+}
+
+.toggle-password {
+  position: absolute;
+  right: var(--space-3);
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: var(--space-1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: var(--transition-normal);
+}
+
+.toggle-password:hover {
+  color: var(--text-secondary);
+}
+
 .form-group input {
   padding: var(--space-3);
   border: 2px solid var(--border);
@@ -326,7 +445,55 @@ async function handleTestLogin() {
   box-shadow: 0 0 0 3px var(--accent-primary-light);
 }
 
+.password-strength {
+  margin-top: var(--space-2);
+}
+
+.strength-bar {
+  height: 4px;
+  background: var(--border);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+}
+
+.strength-fill {
+  height: 100%;
+  transition: all 0.3s ease;
+  border-radius: var(--radius-full);
+}
+
+.strength-fill.weak {
+  background: var(--accent-danger);
+}
+
+.strength-fill.medium {
+  background: var(--accent-warning);
+}
+
+.strength-fill.strong {
+  background: var(--accent-success);
+}
+
+.strength-text {
+  font-size: var(--font-size-xs);
+  color: var(--text-muted);
+  margin-top: var(--space-1);
+  display: block;
+}
+
+.field-error {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--font-size-xs);
+  color: var(--accent-danger);
+  margin-top: var(--space-1);
+}
+
 .error-message {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
   padding: var(--space-3);
   background: rgba(229, 115, 115, 0.1);
   border-radius: var(--radius-md);
@@ -335,6 +502,10 @@ async function handleTestLogin() {
 }
 
 .submit-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
   padding: var(--space-4);
   background: var(--accent-primary);
   color: white;
@@ -356,6 +527,46 @@ async function handleTestLogin() {
 .submit-btn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+.test-login-section {
+  margin-top: var(--space-6);
+  padding-top: var(--space-6);
+  border-top: 1px solid var(--border);
+}
+
+.test-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  width: 100%;
+  padding: var(--space-3);
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  transition: var(--transition-normal);
+}
+
+.test-btn:hover:not(:disabled) {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.test-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.test-hint {
+  font-size: var(--font-size-xs);
+  color: var(--text-muted);
+  margin-top: var(--space-2);
+  text-align: center;
 }
 
 .login-footer {
