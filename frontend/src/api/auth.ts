@@ -8,12 +8,13 @@ export interface User {
 }
 
 export interface LoginRequest {
-  username: string
+  email: string
   password: string
 }
 
 export interface RegisterRequest {
   username: string
+  email: string
   password: string
 }
 
@@ -23,18 +24,11 @@ export interface AuthResponse {
   user: User
 }
 
-// 将 username 转换为 email 格式（使用真实域名）
-function usernameToEmail(username: string): string {
-  return `${username}@doit-app.com`
-}
-
 // 注册
 export async function register(data: RegisterRequest): Promise<AuthResponse> {
-  const email = usernameToEmail(data.username)
-  
-  // 1. 使用 Supabase Auth 注册
+  // 1. 使用 Supabase Auth 注册（使用真实邮箱）
   const { data: authData, error: authError } = await supabase.auth.signUp({
-    email,
+    email: data.email,
     password: data.password
   })
   
@@ -84,10 +78,8 @@ export async function register(data: RegisterRequest): Promise<AuthResponse> {
 
 // 登录
 export async function login(data: LoginRequest): Promise<AuthResponse> {
-  const email = usernameToEmail(data.username)
-  
   const { data: authData, error } = await supabase.auth.signInWithPassword({
-    email,
+    email: data.email,
     password: data.password
   })
   

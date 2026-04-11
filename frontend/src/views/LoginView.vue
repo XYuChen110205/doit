@@ -27,11 +27,11 @@
       <!-- 登录表单 -->
       <form v-if="isLogin" class="login-form" @submit.prevent="handleLogin">
         <div class="form-group">
-          <label>用户名</label>
+          <label>邮箱</label>
           <input 
-            v-model="loginForm.username" 
-            type="text" 
-            placeholder="请输入用户名"
+            v-model="loginForm.email" 
+            type="email" 
+            placeholder="请输入邮箱"
             required
           />
         </div>
@@ -129,7 +129,7 @@ const isLogin = ref(true)
 const passwordError = ref('')
 
 const loginForm = reactive({
-  username: '',
+  email: '',
   password: ''
 })
 
@@ -142,7 +142,7 @@ const registerForm = reactive({
 
 async function handleLogin() {
   const success = await userStore.login({
-    username: loginForm.username,
+    email: loginForm.email,
     password: loginForm.password
   })
   
