@@ -369,7 +369,8 @@ const router = createRouter({
 // 路由守卫 - 检查登录状态
 router.beforeEach((to, from, next) => {
   const token = localStorage.getItem('token')
-  const isLoggedIn = !!token
+  const user = localStorage.getItem('user')
+  const isLoggedIn = !!(token || user)
 
   // 如果访问登录页且已登录，跳转到首页
   if (to.path === '/login' && isLoggedIn) {

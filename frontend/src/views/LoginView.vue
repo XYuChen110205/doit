@@ -210,6 +210,7 @@ async function handleTestLogin() {
     // 保存到 localStorage
     localStorage.setItem('user', JSON.stringify(testUser))
     localStorage.setItem('isLocalTestUser', 'true')
+    localStorage.setItem('token', 'local-test-token-' + Date.now()) // 设置 token 用于路由守卫
     
     // 更新 store
     userStore.user = testUser
