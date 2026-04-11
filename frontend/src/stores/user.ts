@@ -78,10 +78,18 @@ export const useUserStore = defineStore('user', () => {
   function init() {
     // 从 localStorage 恢复登录状态
     const savedUser = localStorage.getItem('user')
+    const isLocalTestUser = localStorage.getItem('isLocalTestUser')
     
     if (savedUser) {
       user.value = JSON.parse(savedUser)
-      // 验证 session 是否有效
+      
+      // 如果是本地测试用户，跳过 Supabase 验证
+      if (isLocalTestUser === 'true') {
+        console.log('本地测试用户，跳过 Supabase 验证')
+        return
+      }
+      
+      // 验证 session 是否有效（仅对 Supabase 用户）
       supabase.auth.getSession().then(({ data: { session } }) => {
         if (session) {
           // Session 有效，刷新用户信息
@@ -93,16 +101,18 @@ export const useUserStore = defineStore('user', () => {
       })
     }
     
-    // 监听认证状态变化
-    supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'SIGNED_OUT' || !session) {
-        user.value = null
-        localStorage.removeItem('user')
-      } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-        // 登录或 token 刷新时，刷新用户信息
-        fetchUserInfo()
-      }
-    })
+    // 监听认证状态变化（仅对 Supabase 用户）
+    if (!isLocalTestUser) {
+      supabase.auth.onAuthStateChange((event, session) => {
+        if (event === 'SIGNED_OUT' || !session) {
+          user.value = null
+          localStorage.removeItem('user')
+        } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+          // 登录或 token 刷新时，刷新用户信息
+          fetchUserInfo()
+        }
+      })
+    }
   }
 
   return {
