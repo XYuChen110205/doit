@@ -40,16 +40,12 @@ export const useUserStore = defineStore('user', () => {
     error.value = null
     
     try {
-      const response = await apiRegister(data)
-      user.value = response.user
-      
-      // 保存用户信息到 localStorage
-      localStorage.setItem('user', JSON.stringify(response.user))
-      
-      return true
+      const result = await apiRegister(data)
+      // 注册成功不自动登录，返回提示信息
+      return result
     } catch (err: any) {
       error.value = err.message || '注册失败'
-      return false
+      throw err
     } finally {
       isLoading.value = false
     }

@@ -24,9 +24,14 @@ export interface AuthResponse {
   user: User
 }
 
+// 从 email 提取用户名（@前面部分）
+function extractUsernameFromEmail(email: string): string {
+  return email.split('@')[0]
+}
+
 // 注册
-export async function register(data: RegisterRequest): Promise<AuthResponse> {
-  // 1. 使用 Supabase Auth 注册（使用真实邮箱）
+export async function register(data: RegisterRequest): Promise<{ message: string }> {
+  // 使用 Supabase Auth 注册（使用真实邮箱）
   const { data: authData, error: authError } = await supabase.auth.signUp({
     email: data.email,
     password: data.password
@@ -40,39 +45,9 @@ export async function register(data: RegisterRequest): Promise<AuthResponse> {
     throw new Error('注册失败')
   }
   
-  // 2. 在 users 表中插入用户信息
-  const { error: insertError } = await supabase
-    .from('users')
-    .insert({
-      id: authData.user.id,
-      username: data.username,
-      display_name: data.username,
-      password_hash: '', // Supabase Auth 管理密码，这里留空
-      created_at: new Date().toISOString()
-    })
-  
-  if (insertError) {
-    throw new Error(insertError.message)
-  }
-  
-  // 3. 获取 session
-  const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
-  
-  if (sessionError || !sessionData.session) {
-    throw new Error('获取会话失败')
-  }
-  
-  const user: User = {
-    id: authData.user.id,
-    username: data.username,
-    display_name: data.username,
-    created_at: new Date().toISOString()
-  }
-  
+  // 注册成功，返回提示信息（不立即创建 users 记录）
   return {
-    access_token: sessionData.session.access_token,
-    token_type: 'bearer',
-    user
+    message: '注册成功！请查收邮箱确认链接，确认后即可登录。'
   }
 }
 
@@ -91,22 +66,54 @@ export async function login(data: LoginRequest): Promise<AuthResponse> {
     throw new Error('登录失败')
   }
   
-  // 获取用户信息
+  const uid = authData.user.id
+  const email = authData.user.email || ''
+  
+  // 检查 users 表是否有该用户的记录
   const { data: userData, error: userError } = await supabase
     .from('users')
     .select('*')
-    .eq('id', authData.user.id)
+    .eq('id', uid)
     .single()
   
-  if (userError) {
-    throw new Error(userError.message)
-  }
+  let user: User
   
-  const user: User = {
-    id: authData.user.id,
-    username: userData.username,
-    display_name: userData.display_name,
-    created_at: userData.created_at
+  if (userError && userError.code === 'PGRST116') {
+    // 没有找到记录，首次登录，自动创建 users 记录
+    const username = extractUsernameFromEmail(email)
+    
+    const { data: newUser, error: insertError } = await supabase
+      .from('users')
+      .insert({
+        id: uid,
+        username: username,
+        display_name: username,
+        password_hash: '', // Supabase Auth 管理密码，这里留空
+        created_at: new Date().toISOString()
+      })
+      .select()
+      .single()
+    
+    if (insertError) {
+      throw new Error(insertError.message)
+    }
+    
+    user = {
+      id: newUser.id,
+      username: newUser.username,
+      display_name: newUser.display_name,
+      created_at: newUser.created_at
+    }
+  } else if (userError) {
+    throw new Error(userError.message)
+  } else {
+    // 找到记录
+    user = {
+      id: userData.id,
+      username: userData.username,
+      display_name: userData.display_name,
+      created_at: userData.created_at
+    }
   }
   
   return {

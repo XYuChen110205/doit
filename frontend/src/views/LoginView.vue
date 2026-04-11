@@ -164,14 +164,19 @@ async function handleRegister() {
     return
   }
   
-  const success = await userStore.register({
-    username: registerForm.username,
-    email: registerForm.email,
-    password: registerForm.password
-  })
-  
-  if (success) {
-    router.push('/')
+  try {
+    const result = await userStore.register({
+      username: registerForm.username,
+      email: registerForm.email,
+      password: registerForm.password
+    })
+    
+    // 显示成功提示，不自动跳转
+    alert(result.message)
+    // 切换到登录页
+    isLogin.value = true
+  } catch (error: any) {
+    alert(error.message || '注册失败')
   }
 }
 </script>
