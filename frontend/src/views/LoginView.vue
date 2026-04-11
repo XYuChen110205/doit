@@ -196,40 +196,26 @@ async function handleRegister() {
   }
 }
 
-// 测试登录（免注册）
+// 测试登录（免注册）- 纯本地模式，绕过 Supabase
 async function handleTestLogin() {
   try {
-    // 使用固定的测试账号登录
-    const testEmail = 'test@example.com'
-    const testPassword = 'test123456'
-    
-    const success = await userStore.login({
-      email: testEmail,
-      password: testPassword
-    })
-    
-    if (success) {
-      router.push('/')
-    } else {
-      // 如果登录失败（测试账号不存在），尝试注册
-      try {
-        await userStore.register({
-          username: 'test',
-          email: testEmail,
-          password: testPassword
-        })
-        // 注册成功后再次登录
-        const loginSuccess = await userStore.login({
-          email: testEmail,
-          password: testPassword
-        })
-        if (loginSuccess) {
-          router.push('/')
-        }
-      } catch (regError: any) {
-        alert('测试登录失败：' + regError.message)
-      }
+    // 创建本地测试用户（不走 Supabase）
+    const testUser = {
+      id: 'local-test-user-' + Date.now(),
+      username: '测试用户',
+      display_name: '测试用户',
+      created_at: new Date().toISOString()
     }
+    
+    // 保存到 localStorage
+    localStorage.setItem('user', JSON.stringify(testUser))
+    localStorage.setItem('isLocalTestUser', 'true')
+    
+    // 更新 store
+    userStore.user = testUser
+    
+    // 跳转到首页
+    router.push('/')
   } catch (error: any) {
     alert('测试登录失败：' + error.message)
   }
