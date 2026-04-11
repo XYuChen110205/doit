@@ -110,6 +110,22 @@
         </button>
       </form>
 
+      <!-- 测试登录按钮 -->
+      <div class="test-login-section" style="margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--border-color);">
+        <button 
+          type="button" 
+          class="submit-btn"
+          style="background: var(--bg-secondary); color: var(--text-secondary);"
+          @click="handleTestLogin"
+          :disabled="userStore.isLoading"
+        >
+          测试登录（免注册）
+        </button>
+        <p style="font-size: 12px; color: var(--text-tertiary); margin-top: 8px; text-align: center;">
+          使用测试账号直接登录，数据仅保存在当前设备
+        </p>
+      </div>
+
       <div class="login-footer">
         <p>登录后即可在多设备同步数据</p>
       </div>
@@ -177,6 +193,45 @@ async function handleRegister() {
     isLogin.value = true
   } catch (error: any) {
     alert(error.message || '注册失败')
+  }
+}
+
+// 测试登录（免注册）
+async function handleTestLogin() {
+  try {
+    // 使用固定的测试账号登录
+    const testEmail = 'test@example.com'
+    const testPassword = 'test123456'
+    
+    const success = await userStore.login({
+      email: testEmail,
+      password: testPassword
+    })
+    
+    if (success) {
+      router.push('/')
+    } else {
+      // 如果登录失败（测试账号不存在），尝试注册
+      try {
+        await userStore.register({
+          username: 'test',
+          email: testEmail,
+          password: testPassword
+        })
+        // 注册成功后再次登录
+        const loginSuccess = await userStore.login({
+          email: testEmail,
+          password: testPassword
+        })
+        if (loginSuccess) {
+          router.push('/')
+        }
+      } catch (regError: any) {
+        alert('测试登录失败：' + regError.message)
+      }
+    }
+  } catch (error: any) {
+    alert('测试登录失败：' + error.message)
   }
 }
 </script>
