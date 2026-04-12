@@ -31,8 +31,8 @@
         </div>
         <div class="toolbar-right">
           <span class="word-count">{{ wordCount }} 字</span>
-          <button class="tool-btn" @click="showBgSelector = !showBgSelector" title="更换背景">
-            <SvgIcon name="Palette" :size="16" />
+          <button class="tool-btn" @click="showSettings = !showSettings" title="设置">
+            <SvgIcon name="Settings" :size="16" />
           </button>
           <button class="tool-btn" @click="copyContent" title="复制全文">
             <SvgIcon name="Copy" :size="16" />
@@ -40,45 +40,68 @@
         </div>
       </div>
 
-      <!-- 背景选择器 -->
-      <div v-if="showBgSelector" class="bg-selector">
-        <div class="selector-header">
-          <span>选择背景</span>
-          <button class="close-btn" @click="showBgSelector = false">
-            <SvgIcon name="ChevronUp" :size="16" />
-          </button>
-        </div>
-        <div class="bg-grid">
-          <div
-            v-for="bg in backgroundOptions"
-            :key="bg.id"
-            class="bg-option"
-            :class="{ active: selectedBg === bg.id }"
-            @click="selectBackground(bg)"
-          >
-            <div class="bg-thumb" :style="{ backgroundImage: `url(${bg.thumb})` }"></div>
-            <span class="bg-name">{{ bg.name }}</span>
+      <!-- 设置面板 -->
+      <div v-if="showSettings" class="settings-panel">
+        <div class="settings-row">
+          <!-- 背景图选择 -->
+          <div class="setting-group">
+            <label>背景图片</label>
+            <div class="bg-grid">
+              <div
+                v-for="bg in backgroundOptions"
+                :key="bg.id"
+                class="bg-option"
+                :class="{ active: selectedBg === bg.id }"
+                @click="selectBackground(bg)"
+              >
+                <div class="bg-thumb" :style="{ backgroundImage: `url(${bg.thumb})` }"></div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- 透明度调节 -->
+          <div class="setting-group sliders">
+            <label>背景透明度: {{ Math.round(bgOpacity * 100) }}%</label>
+            <input
+              type="range"
+              v-model.number="bgOpacity"
+              min="0"
+              max="1"
+              step="0.05"
+              @input="saveData"
+            />
+            
+            <label>画布透明度: {{ Math.round(paperOpacity * 100) }}%</label>
+            <input
+              type="range"
+              v-model.number="paperOpacity"
+              min="0.3"
+              max="1"
+              step="0.05"
+              @input="saveData"
+            />
           </div>
         </div>
       </div>
 
       <!-- 编辑器主体 -->
       <div class="editor-wrapper">
-        <div 
-          ref="editorContainerRef"
-          class="editor-container"
-          :style="editorBgStyle"
-        >
-          <div class="editor-paper">
+        <!-- 上半部分 - 背景图区域 -->
+        <div class="bg-section" :style="bgSectionStyle">
+          <div class="bg-image" :style="bgImageStyle"></div>
+        </div>
+        
+        <!-- 下半部分 - 写作区域 -->
+        <div class="writing-section">
+          <div class="editor-paper" :style="paperStyle">
             <div class="paper-title">{{ title || '无标题' }}</div>
-            <div 
+            <textarea
               ref="editorRef"
+              v-model="content"
               class="editor-content"
-              contenteditable="true"
+              placeholder="在此输入文章内容..."
               @input="onInput"
-              @keydown="onKeyDown"
-              v-html="content"
-            ></div>
+            ></textarea>
             <div class="paper-footer">
               <span class="author">{{ author || '匿名' }}</span>
               <span class="date">{{ formatDate(updatedAt) }}</span>
@@ -96,7 +119,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import SvgIcon from '../icons/SvgIcon.vue'
 
 interface BeautifulEditorData {
@@ -104,6 +127,8 @@ interface BeautifulEditorData {
   content?: string
   author?: string
   backgroundId?: string
+  bgOpacity?: number
+  paperOpacity?: number
   updatedAt?: string
 }
 
@@ -112,8 +137,6 @@ interface BackgroundOption {
   name: string
   url: string
   thumb: string
-  textColor: string
-  titleColor: string
 }
 
 const props = defineProps<{
@@ -128,14 +151,14 @@ const emit = defineEmits<{
   closeDetail: []
 }>()
 
-// 背景选项 - 使用相对路径
+// 背景选项
 const backgroundOptions: BackgroundOption[] = [
-  { id: 'bg1', name: '田园风光', url: './backgrounds/bg1.jpg', thumb: './backgrounds/bg1.jpg', textColor: '#333', titleColor: '#2c3e50' },
-  { id: 'bg2', name: '春日嬉戏', url: './backgrounds/bg2.jpg', thumb: './backgrounds/bg2.jpg', textColor: '#333', titleColor: '#2c3e50' },
-  { id: 'bg3', name: '荷塘月色', url: './backgrounds/bg3.jpg', thumb: './backgrounds/bg3.jpg', textColor: '#333', titleColor: '#2c3e50' },
-  { id: 'bg4', name: '桂花飘香', url: './backgrounds/bg4.jpg', thumb: './backgrounds/bg4.jpg', textColor: '#333', titleColor: '#2c3e50' },
-  { id: 'bg5', name: '松鼠纸船', url: './backgrounds/bg5.jpg', thumb: './backgrounds/bg5.jpg', textColor: '#333', titleColor: '#2c3e50' },
-  { id: 'bg6', name: '图书馆', url: './backgrounds/bg6.jpg', thumb: './backgrounds/bg6.jpg', textColor: '#333', titleColor: '#2c3e50' },
+  { id: 'bg1', name: '田园风光', url: './backgrounds/bg1.jpg', thumb: './backgrounds/bg1.jpg' },
+  { id: 'bg2', name: '春日嬉戏', url: './backgrounds/bg2.jpg', thumb: './backgrounds/bg2.jpg' },
+  { id: 'bg3', name: '荷塘月色', url: './backgrounds/bg3.jpg', thumb: './backgrounds/bg3.jpg' },
+  { id: 'bg4', name: '桂花飘香', url: './backgrounds/bg4.jpg', thumb: './backgrounds/bg4.jpg' },
+  { id: 'bg5', name: '松鼠纸船', url: './backgrounds/bg5.jpg', thumb: './backgrounds/bg5.jpg' },
+  { id: 'bg6', name: '图书馆', url: './backgrounds/bg6.jpg', thumb: './backgrounds/bg6.jpg' },
 ]
 
 // 状态
@@ -143,11 +166,12 @@ const title = ref('')
 const content = ref('')
 const author = ref('')
 const selectedBg = ref('bg2')
+const bgOpacity = ref(0.3)
+const paperOpacity = ref(0.95)
 const updatedAt = ref('')
 const saveStatus = ref('已保存')
-const showBgSelector = ref(false)
-const editorRef = ref<HTMLDivElement>()
-const editorContainerRef = ref<HTMLDivElement>()
+const showSettings = ref(false)
+const editorRef = ref<HTMLTextAreaElement>()
 let saveTimeout: ReturnType<typeof setTimeout> | null = null
 
 // 计算属性
@@ -161,19 +185,25 @@ const previewBgStyle = computed(() => ({
   backgroundPosition: 'center'
 }))
 
-const editorBgStyle = computed(() => ({
+const bgSectionStyle = computed(() => ({
   backgroundImage: `url(${currentBg.value.url})`,
   backgroundSize: 'cover',
-  backgroundPosition: 'center bottom',
-  backgroundRepeat: 'no-repeat'
+  backgroundPosition: 'center top',
+  opacity: bgOpacity.value
+}))
+
+const bgImageStyle = computed(() => ({
+  backgroundImage: `url(${currentBg.value.url})`,
+  backgroundSize: 'cover',
+  backgroundPosition: 'center top'
+}))
+
+const paperStyle = computed(() => ({
+  backgroundColor: `rgba(255, 255, 255, ${paperOpacity.value})`
 }))
 
 const previewText = computed(() => {
-  const temp = document.createElement('div')
-  temp.innerHTML = content.value
-  let text = temp.textContent || temp.innerText || ''
-  // 移除拼音
-  text = text.replace(/[a-z]+'/gi, '').replace(/[a-z]+/gi, '')
+  let text = content.value || ''
   if (text.length > 60) {
     text = text.slice(0, 60) + '...'
   }
@@ -181,12 +211,7 @@ const previewText = computed(() => {
 })
 
 const wordCount = computed(() => {
-  const temp = document.createElement('div')
-  temp.innerHTML = content.value
-  let text = temp.textContent || temp.innerText || ''
-  // 移除拼音
-  text = text.replace(/[a-z]+'/gi, '').replace(/[a-z]+/gi, '')
-  return text.length
+  return content.value.length
 })
 
 // 方法
@@ -196,6 +221,8 @@ function loadData() {
     content.value = props.initialData.content || ''
     author.value = props.initialData.author || ''
     selectedBg.value = props.initialData.backgroundId || 'bg2'
+    bgOpacity.value = props.initialData.bgOpacity ?? 0.3
+    paperOpacity.value = props.initialData.paperOpacity ?? 0.95
     updatedAt.value = props.initialData.updatedAt || new Date().toISOString()
   }
 }
@@ -207,27 +234,19 @@ function saveData() {
     content: content.value,
     author: author.value,
     backgroundId: selectedBg.value,
+    bgOpacity: bgOpacity.value,
+    paperOpacity: paperOpacity.value,
     updatedAt: updatedAt.value
   })
   saveStatus.value = '已保存'
 }
 
 function onInput() {
-  if (!editorRef.value) return
-  content.value = editorRef.value.innerHTML
   saveStatus.value = '保存中...'
   if (saveTimeout) clearTimeout(saveTimeout)
   saveTimeout = setTimeout(() => {
     saveData()
-  }, 800)
-}
-
-function onKeyDown(e: KeyboardEvent) {
-  if (e.key === 'Enter') {
-    e.preventDefault()
-    document.execCommand('defaultParagraphSeparator', false, 'p')
-    document.execCommand('insertParagraph', false)
-  }
+  }, 500)
 }
 
 function selectBackground(bg: BackgroundOption) {
@@ -245,12 +264,7 @@ function closeDetail() {
 }
 
 function copyContent() {
-  const temp = document.createElement('div')
-  temp.innerHTML = content.value
-  let text = temp.textContent || temp.innerText || ''
-  // 移除拼音
-  text = text.replace(/[a-z]+'/gi, '').replace(/[a-z]+/gi, '')
-  const fullText = `${title.value}\n\n${text}\n\n—— ${author.value || '匿名'} ${formatDate(updatedAt.value)}`
+  const fullText = `${title.value}\n\n${content.value}\n\n—— ${author.value || '匿名'} ${formatDate(updatedAt.value)}`
   navigator.clipboard.writeText(fullText).then(() => {
     saveStatus.value = '已复制'
     setTimeout(() => saveStatus.value = '已保存', 1500)
@@ -274,20 +288,8 @@ function formatDate(isoString: string): string {
   return `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日`
 }
 
-// 监听详情模式变化
-watch(() => props.isDetailView, (isDetail) => {
-  if (isDetail) {
-    setTimeout(() => {
-      editorRef.value?.focus()
-    }, 100)
-  }
-})
-
 onMounted(() => {
   loadData()
-  if (editorRef.value && content.value) {
-    editorRef.value.innerHTML = content.value
-  }
 })
 </script>
 
@@ -377,7 +379,7 @@ onMounted(() => {
   height: 100%;
   display: flex;
   flex-direction: column;
-  background: #f0f0f0;
+  background: #f5f5f5;
 }
 
 .detail-toolbar {
@@ -454,8 +456,8 @@ onMounted(() => {
   padding: 0 8px;
 }
 
-/* 背景选择器 */
-.bg-selector {
+/* 设置面板 */
+.settings-panel {
   background: white;
   border-bottom: 1px solid #e0e0e0;
   padding: 16px 20px;
@@ -474,144 +476,151 @@ onMounted(() => {
   }
 }
 
-.selector-header {
+.settings-row {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 12px;
-  font-size: 14px;
-  color: #666;
+  gap: 32px;
+  align-items: flex-start;
 }
 
-.close-btn {
-  width: 28px;
-  height: 28px;
+.setting-group {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  background: #f0f0f0;
-  border: none;
-  border-radius: 6px;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.setting-group label {
+  font-size: 13px;
   color: #666;
+  font-weight: 500;
+}
+
+.setting-group.sliders {
+  min-width: 200px;
+}
+
+.setting-group input[type="range"] {
+  width: 100%;
+  height: 6px;
+  border-radius: 3px;
+  background: #e0e0e0;
+  outline: none;
+  -webkit-appearance: none;
+}
+
+.setting-group input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #4a90d9;
   cursor: pointer;
 }
 
 .bg-grid {
   display: flex;
-  gap: 12px;
-  overflow-x: auto;
-  padding-bottom: 8px;
+  gap: 8px;
 }
 
 .bg-option {
-  flex-shrink: 0;
-  width: 80px;
-  text-align: center;
+  width: 60px;
+  height: 45px;
+  border-radius: 6px;
   cursor: pointer;
   transition: all 0.2s;
+  border: 2px solid transparent;
+  overflow: hidden;
 }
 
 .bg-option:hover {
   transform: translateY(-2px);
 }
 
-.bg-option.active .bg-thumb {
-  box-shadow: 0 0 0 3px #4a90d9;
+.bg-option.active {
+  border-color: #4a90d9;
+  box-shadow: 0 0 0 2px rgba(74, 144, 217, 0.3);
 }
 
 .bg-thumb {
-  width: 80px;
-  height: 60px;
-  border-radius: 8px;
+  width: 100%;
+  height: 100%;
   background-size: cover;
   background-position: center;
-  margin-bottom: 6px;
-  transition: all 0.2s;
-}
-
-.bg-name {
-  font-size: 11px;
-  color: #666;
-}
-
-.bg-option.active .bg-name {
-  color: #4a90d9;
-  font-weight: 500;
 }
 
 /* 编辑器主体 */
 .editor-wrapper {
   flex: 1;
+  display: flex;
+  flex-direction: column;
   overflow: hidden;
-  position: relative;
 }
 
-.editor-container {
-  height: 100%;
+/* 上半部分 - 背景图 */
+.bg-section {
+  height: 40%;
+  min-height: 200px;
+  position: relative;
+  transition: opacity 0.3s ease;
+}
+
+.bg-image {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center top;
+}
+
+/* 下半部分 - 写作区域 */
+.writing-section {
+  flex: 1;
   overflow-y: auto;
-  padding: 40px 20px;
-  background-color: #f5f5f5;
-  background-size: contain;
-  background-position: center bottom;
-  background-repeat: no-repeat;
-  background-attachment: scroll;
+  padding: 20px;
+  background: linear-gradient(to bottom, #f5f5f5 0%, #fff 100px);
 }
 
 .editor-paper {
-  max-width: 680px;
-  margin: 0 auto 200px;
-  background: rgba(255, 255, 255, 0.95);
+  max-width: 720px;
+  margin: 0 auto;
   border-radius: 12px;
-  padding: 48px 56px;
+  padding: 40px 48px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-  min-height: 500px;
+  min-height: 400px;
 }
 
 .paper-title {
-  font-size: 26px;
+  font-size: 24px;
   font-weight: 600;
   color: #2c3e50;
   text-align: center;
-  margin-bottom: 32px;
+  margin-bottom: 28px;
   font-family: 'STKaiti', 'KaiTi', 'SimKaiti', 'Microsoft YaHei', serif;
   letter-spacing: 2px;
 }
 
 .editor-content {
-  min-height: 400px;
-  font-size: 17px;
+  width: 100%;
+  min-height: 300px;
+  font-size: 16px;
   line-height: 2;
   color: #333;
   outline: none;
+  border: none;
+  resize: none;
+  background: transparent;
   font-family: 'STKaiti', 'KaiTi', 'SimKaiti', 'Microsoft YaHei', serif;
 }
 
-.editor-content:empty::before {
-  content: '在此输入文章内容...';
+.editor-content::placeholder {
   color: #999;
   font-style: italic;
 }
 
-/* 移除拼音样式 */
-.editor-content :deep(ruby) {
-  display: inline;
-}
-
-.editor-content :deep(rt) {
-  display: none;
-}
-
-.editor-content :deep(p) {
-  margin: 0 0 1em 0;
-  text-indent: 2em;
-}
-
 .paper-footer {
-  margin-top: 48px;
-  padding-top: 24px;
+  margin-top: 40px;
+  padding-top: 20px;
   border-top: 1px solid #e0e0e0;
   text-align: right;
-  font-size: 14px;
+  font-size: 13px;
   color: #666;
   font-family: 'STKaiti', 'KaiTi', 'SimKaiti', 'Microsoft YaHei', serif;
 }
@@ -622,7 +631,7 @@ onMounted(() => {
 
 /* 底部状态栏 */
 .detail-footer {
-  padding: 12px 20px;
+  padding: 10px 20px;
   background: white;
   border-top: 1px solid #e0e0e0;
   text-align: center;
@@ -636,13 +645,22 @@ onMounted(() => {
 
 /* 响应式 */
 @media (max-width: 768px) {
+  .settings-row {
+    flex-direction: column;
+    gap: 16px;
+  }
+  
+  .bg-section {
+    height: 30%;
+    min-height: 150px;
+  }
+  
   .editor-paper {
-    padding: 32px 24px;
-    margin-bottom: 100px;
+    padding: 24px;
   }
   
   .paper-title {
-    font-size: 22px;
+    font-size: 20px;
   }
   
   .editor-content {
