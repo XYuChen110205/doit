@@ -1,103 +1,74 @@
 <template>
   <div class="inbox-view">
-    <!-- 加载状态 -->
-    <div v-if="isLoading" class="loading-state">
-      <SvgIcon name="Loading" :size="32" />
-      <span>加载中...</span>
+    <!-- 添加新条目 -->
+    <div class="add-section">
+      <div class="input-wrapper">
+        <textarea
+          ref="textareaRef"
+          v-model="newItemContent"
+          class="inbox-textarea"
+          placeholder="记录任何想法、待办事项...&#10;支持多行输入，按 Ctrl+Enter 添加"
+          @input="autoResize"
+          @keydown.ctrl.enter="addItem"
+        ></textarea>
+        <button
+          class="add-btn"
+          :disabled="!newItemContent.trim()"
+          @click="addItem"
+        >
+          <SvgIcon name="Plus" :size="16" />
+          添加
+        </button>
+      </div>
     </div>
 
-    <template v-else>
-      <!-- 添加新条目 -->
-      <div class="add-section">
-        <div class="input-wrapper">
-          <input
-            v-model="newItemContent"
-            type="text"
-            class="inbox-input"
-            placeholder="记录任何想法、待办事项..."
-            @keyup.enter="addItem"
-          />
+    <!-- 条目列表 -->
+    <div class="items-list">
+      <div
+        v-for="item in items"
+        :key="item.id"
+        class="inbox-item"
+      >
+        <div class="item-content">
+          <span class="item-text">{{ item.content }}</span>
+          <span class="item-date">{{ formatDate(item.createdAt) }}</span>
+        </div>
+        <div class="item-actions">
           <button
-            class="add-btn"
-            :disabled="!newItemContent.trim()"
-            @click="addItem"
+            class="action-btn convert"
+            @click="convertToTask(item)"
+            title="转为任务"
           >
-            <SvgIcon name="Plus" :size="16" />
-            添加
+            <SvgIcon name="Task" :size="16" />
+            <span>转任务</span>
+          </button>
+          <button
+            class="action-btn delete"
+            @click="deleteItem(item.id)"
+            title="删除"
+          >
+            <SvgIcon name="Trash" :size="16" />
           </button>
         </div>
       </div>
 
-      <!-- 条目列表 -->
-      <div class="items-list">
-        <div
-          v-for="item in items"
-          :key="item.id"
-          class="inbox-item"
-          :class="{ 'is-processing': item.isProcessing }"
-        >
-          <div class="item-content">
-            <span class="item-text">{{ item.content }}</span>
-            <span class="item-date">{{ formatDate(item.created_at) }}</span>
+      <!-- 空状态 -->
+      <div v-if="items.length === 0" class="empty-state">
+        <SvgIcon name="InboxEmpty" :size="64" />
+        <h3>收集箱是空的</h3>
+        <p>把任何想法、待办事项先丢进来，稍后再整理</p>
+        <div class="empty-tips">
+          <div class="tip-item">
+            <SvgIcon name="Plus" :size="14" />
+            <span>快速记录灵感</span>
           </div>
-          <div class="item-actions">
-            <button
-              class="action-btn convert"
-              :disabled="item.isProcessing"
-              @click="convertToTask(item)"
-              title="转为任务"
-            >
-              <SvgIcon name="Task" :size="16" />
-              <span>转任务</span>
-            </button>
-            <button
-              class="action-btn delete"
-              @click="confirmDelete(item)"
-              title="删除"
-            >
-              <SvgIcon name="Trash" :size="16" />
-            </button>
-          </div>
-        </div>
-
-        <!-- 空状态 -->
-        <div v-if="items.length === 0" class="empty-state">
-          <SvgIcon name="InboxEmpty" :size="64" />
-          <h3>收集箱是空的</h3>
-          <p>把任何想法、待办事项先丢进来，稍后再整理</p>
-          <div class="empty-tips">
-            <div class="tip-item">
-              <SvgIcon name="Plus" :size="14" />
-              <span>快速记录灵感</span>
-            </div>
-            <div class="tip-item">
-              <SvgIcon name="Task" :size="14" />
-              <span>随时转为正式任务</span>
-            </div>
+          <div class="tip-item">
+            <SvgIcon name="Task" :size="14" />
+            <span>随时转为正式任务</span>
           </div>
         </div>
       </div>
-    </template>
-
-    <!-- 删除确认弹窗 -->
-    <BaseModal v-model="showDeleteConfirm" title="确认删除">
-      <div class="confirm-content">
-        <p>确定要删除这条记录吗？</p>
-        <p class="confirm-hint">删除后将无法恢复</p>
-      </div>
-      <template #footer>
-        <BaseButton variant="secondary" @click="showDeleteConfirm = false">取消</BaseButton>
-        <BaseButton variant="danger" @click="executeDelete">删除</BaseButton>
-      </template>
-    </BaseModal>
-
-    <!-- 错误提示 -->
-    <Transition name="toast">
-      <div v-if="errorMessage" class="error-toast">
-        <SvgIcon name="Alert" :size="16" />
-        <span>{{ errorMessage }}</span>
-      </div>
-    </Transition>
+    </div>
 
     <!-- 成功提示 -->
     <Transition name="toast">
@@ -112,33 +83,37 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { listInboxItems, createInboxItem, deleteInboxItem } from '../api/inbox'
-import { createTask } from '../api/tasks'
-import type { InboxItem } from '../types'
 import SvgIcon from '../components/icons/SvgIcon.vue'
-import BaseModal from '../components/base/BaseModal.vue'
-import BaseButton from '../components/base/BaseButton.vue'
 
 const router = useRouter()
 
+// 类型定义
+interface InboxItem {
+  id: string
+  content: string
+  createdAt: string
+}
+
+// 状态
 const items = ref<InboxItem[]>([])
 const newItemContent = ref('')
-const isLoading = ref(false)
-const errorMessage = ref('')
 const successMessage = ref('')
-const showDeleteConfirm = ref(false)
-const itemToDelete = ref<InboxItem | null>(null)
+const textareaRef = ref<HTMLTextAreaElement>()
 
-let errorTimer: ReturnType<typeof setTimeout> | null = null
 let successTimer: ReturnType<typeof setTimeout> | null = null
 
-// 显示错误提示
-function showError(message: string) {
-  errorMessage.value = message
-  if (errorTimer) clearTimeout(errorTimer)
-  errorTimer = setTimeout(() => {
-    errorMessage.value = ''
-  }, 3000)
+// 自动调整文本框高度
+function autoResize() {
+  const textarea = textareaRef.value
+  if (!textarea) return
+  
+  textarea.style.height = 'auto'
+  textarea.style.height = textarea.scrollHeight + 'px'
+}
+
+// 生成唯一ID
+function generateId(): string {
+  return Date.now().toString(36) + Math.random().toString(36).substr(2)
 }
 
 // 显示成功提示
@@ -167,79 +142,67 @@ function formatDate(dateString: string): string {
 }
 
 // 加载收集箱条目
-async function loadItems() {
-  isLoading.value = true
-  try {
-    items.value = await listInboxItems()
-  } catch (error) {
-    console.error('加载收集箱失败:', error)
-    showError('加载失败，请检查网络连接')
-  } finally {
-    isLoading.value = false
+function loadItems() {
+  const saved = localStorage.getItem('inboxItems')
+  if (saved) {
+    items.value = JSON.parse(saved)
   }
+}
+
+// 保存到本地存储
+function saveItems() {
+  localStorage.setItem('inboxItems', JSON.stringify(items.value))
 }
 
 // 添加新条目
-async function addItem() {
+function addItem() {
   const content = newItemContent.value.trim()
   if (!content) return
 
-  try {
-    await createInboxItem({ content })
-    newItemContent.value = ''
-    await loadItems()
-    showSuccess('已添加到收集箱')
-  } catch (error) {
-    console.error('添加失败:', error)
-    showError('添加失败，请重试')
+  const newItem: InboxItem = {
+    id: generateId(),
+    content,
+    createdAt: new Date().toISOString()
   }
+
+  items.value.unshift(newItem)
+  saveItems()
+  newItemContent.value = ''
+  // 重置文本框高度
+  if (textareaRef.value) {
+    textareaRef.value.style.height = 'auto'
+  }
+  showSuccess('已添加到收集箱')
 }
 
-// 确认删除
-function confirmDelete(item: InboxItem) {
-  itemToDelete.value = item
-  showDeleteConfirm.value = true
-}
-
-// 执行删除
-async function executeDelete() {
-  if (!itemToDelete.value) return
-
-  try {
-    await deleteInboxItem(itemToDelete.value.id)
-    await loadItems()
-    showDeleteConfirm.value = false
-    itemToDelete.value = null
-    showSuccess('已删除')
-  } catch (error) {
-    console.error('删除失败:', error)
-    showError('删除失败')
-  }
+// 删除条目
+function deleteItem(id: string) {
+  items.value = items.value.filter(item => item.id !== id)
+  saveItems()
+  showSuccess('已删除')
 }
 
 // 转为任务
-async function convertToTask(item: InboxItem) {
-  item.isProcessing = true
-  try {
-    // 创建任务
-    const today = new Date().toISOString().split('T')[0]
-    await createTask({
-      title: item.content,
-      due_date: today,
-      source: 'inbox'
-    })
-
-    // 删除收集箱条目
-    await deleteInboxItem(item.id)
-
-    await loadItems()
-    showSuccess('已转为今日任务')
-  } catch (error) {
-    console.error('转换失败:', error)
-    showError('转换失败，请重试')
-  } finally {
-    item.isProcessing = false
+function convertToTask(item: InboxItem) {
+  // 获取现有任务
+  const tasks = JSON.parse(localStorage.getItem('tasks') || '[]')
+  
+  // 创建新任务
+  const newTask = {
+    id: generateId(),
+    title: item.content,
+    status: 'pending',
+    due_date: new Date().toISOString().split('T')[0],
+    createdAt: new Date().toISOString()
   }
+  
+  tasks.push(newTask)
+  localStorage.setItem('tasks', JSON.stringify(tasks))
+  
+  // 删除收集箱条目
+  deleteItem(item.id)
+  
+  showSuccess('已转为今日任务')
 }
 
 onMounted(() => {
@@ -252,17 +215,6 @@ onMounted(() => {
   max-width: 800px;
   margin: 0 auto;
   padding: var(--space-6);
-}
-
-/* 加载状态 */
-.loading-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-3);
-  padding: var(--space-10);
-  color: var(--text-secondary);
 }
 
 /* 添加区域 */
@@ -279,7 +231,7 @@ onMounted(() => {
   box-shadow: var(--shadow-card);
 }
 
-.inbox-input {
+.inbox-textarea {
   flex: 1;
   padding: var(--space-3) var(--space-4);
   border: 2px solid var(--border);
@@ -289,14 +241,20 @@ onMounted(() => {
   color: var(--text-primary);
   outline: none;
   transition: var(--transition-normal);
+  resize: none;
+  min-height: 60px;
+  max-height: 200px;
+  font-family: inherit;
+  line-height: 1.5;
+  overflow-y: auto;
 }
 
-.inbox-input:focus {
+.inbox-textarea:focus {
   border-color: var(--accent-primary);
   box-shadow: 0 0 0 3px var(--accent-primary-light);
 }
 
-.inbox-input::placeholder {
+.inbox-textarea::placeholder {
   color: var(--text-muted);
 }
 
@@ -351,11 +309,6 @@ onMounted(() => {
   transform: translateY(-1px);
 }
 
-.inbox-item.is-processing {
-  opacity: 0.7;
-  pointer-events: none;
-}
-
 .item-content {
   flex: 1;
   display: flex;
@@ -400,7 +353,7 @@ onMounted(() => {
   color: var(--accent-primary);
 }
 
-.action-btn.convert:hover:not(:disabled) {
+.action-btn.convert:hover {
   background: var(--accent-primary);
   color: white;
 }
@@ -414,11 +367,6 @@ onMounted(() => {
 .action-btn.delete:hover {
   background: rgba(229, 115, 115, 0.15);
   color: var(--accent-danger);
-}
-
-.action-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
 }
 
 /* 空状态 */
@@ -460,26 +408,7 @@ onMounted(() => {
   font-size: var(--font-size-sm);
 }
 
-/* 确认弹窗 */
-.confirm-content {
-  text-align: center;
-  padding: var(--space-4) 0;
-}
-
-.confirm-content p {
-  margin: 0;
-  color: var(--text-primary);
-  font-size: var(--font-size-lg);
-}
-
-.confirm-hint {
-  margin-top: var(--space-2);
-  font-size: var(--font-size-sm);
-  color: var(--text-muted);
-}
-
 /* Toast 提示 */
-.error-toast,
 .success-toast {
   position: fixed;
   bottom: 80px;
@@ -489,21 +418,13 @@ onMounted(() => {
   align-items: center;
   gap: var(--space-3);
   padding: var(--space-4) var(--space-6);
+  background: var(--accent-success);
+  color: white;
   border-radius: var(--radius-lg);
   font-size: var(--font-size-base);
   font-weight: var(--font-weight-medium);
-  z-index: var(--z-toast);
+  z-index: var(--z-toast, 1000);
   box-shadow: var(--shadow-float);
-}
-
-.error-toast {
-  background: var(--accent-danger);
-  color: white;
-}
-
-.success-toast {
-  background: var(--accent-success);
-  color: white;
 }
 
 /* Toast 动画 */

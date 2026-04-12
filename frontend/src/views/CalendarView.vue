@@ -15,108 +15,93 @@
       </div>
       <div class="nav-section">
         <button class="nav-arrow" @click="navigatePrev">
-          <span class="arrow-left"></span>
+          <SvgIcon name="ChevronLeft" :size="20" />
         </button>
         <span class="current-period">{{ periodDisplay }}</span>
         <button class="nav-arrow" @click="navigateNext">
-          <span class="arrow-right"></span>
+          <SvgIcon name="ChevronRight" :size="20" />
         </button>
         <button class="today-btn" @click="goToToday">今天</button>
       </div>
     </div>
 
-    <!-- 标签筛选 -->
-    <div class="tag-filter">
-      <span class="filter-label">筛选标签:</span>
-      <div class="tag-list">
-        <button
-          class="tag-btn all"
-          :class="{ active: selectedTagId === null }"
-          @click="selectedTagId = null"
-        >
-          全部
-        </button>
-        <button
-          v-for="tag in allTags"
-          :key="tag.id"
-          class="tag-btn"
-          :class="{ active: selectedTagId === tag.id }"
-          :style="{ backgroundColor: selectedTagId === tag.id ? tag.color : 'transparent', borderColor: tag.color, color: selectedTagId === tag.id ? '#fff' : tag.color }"
-          @click="selectedTagId = tag.id"
-        >
-          {{ tag.name }}
-        </button>
-      </div>
-    </div>
-
     <!-- 月视图 -->
     <div v-if="currentView === 'month'" class="month-view">
-      <div class="weekdays">
-        <div v-for="day in weekdays" :key="day" class="weekday">{{ day }}</div>
-      </div>
-      <div class="calendar-grid">
-        <div
-          v-for="date in calendarDays"
-          :key="date.dateStr"
-          class="calendar-day"
-          :class="{
-            'other-month': !date.isCurrentMonth,
-            'today': date.isToday,
-            'selected': selectedDate === date.dateStr
-          }"
-          @click="selectDate(date)"
-        >
-          <div class="day-header">
-            <span class="day-number">{{ date.day }}</span>
-            <span v-if="date.lunarDay" class="lunar-day" :class="{ 'lunar-festival': date.isFestival }">{{ date.lunarDay }}</span>
-          </div>
-          <div class="day-info">
-            <span v-if="date.solarTerm" class="solar-term">{{ date.solarTerm }}</span>
-            <span v-if="getDayTaskCount(date.dateStr) > 0" class="task-count">
-              {{ getDayTaskCount(date.dateStr) }} 任务
-            </span>
-          </div>
-          <div class="day-tasks">
-            <div
-              v-for="task in getDayTasksPreview(date.dateStr)"
-              :key="task.id"
-              class="task-block"
-              :style="{ backgroundColor: getTaskFirstTagColor(task) }"
+      <table class="calendar-table">
+        <thead>
+          <tr>
+            <th v-for="day in weekdays" :key="day" class="weekday">{{ day }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="week in calendarWeeks" :key="week[0]?.dateStr">
+            <td
+              v-for="date in week"
+              :key="date.dateStr"
+              class="calendar-day"
+              :class="{
+                'other-month': !date.isCurrentMonth,
+                'today': date.isToday,
+                'selected': selectedDate === date.dateStr
+              }"
+              @click="selectDate(date)"
             >
-              {{ truncateTitle(task.title) }}
-            </div>
-          </div>
-        </div>
-      </div>
+              <div class="day-header">
+                <span class="day-number">{{ date.day }}</span>
+                <span v-if="date.lunar" class="lunar-day">{{ date.lunar }}</span>
+              </div>
+              <div class="day-tasks">
+                <div
+                  v-for="task in getDayTasks(date.dateStr).slice(0, 3)"
+                  :key="task.id"
+                  class="task-dot"
+                  :class="{ done: task.status === 'done' }"
+                ></div>
+              </div>
+              <div v-if="getDayTasks(date.dateStr).length > 3" class="more-tasks">
+                +{{ getDayTasks(date.dateStr).length - 3 }}
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
     </div>
 
     <!-- 日视图 -->
     <div v-else-if="currentView === 'day'" class="day-view">
       <div class="day-header-info">
-        <div class="day-date-info">
-          <span class="day-gregorian">{{ currentDate.getMonth() + 1 }}月{{ currentDate.getDate() }}日</span>
-          <span class="day-lunar">{{ currentLunarDate }}</span>
-          <span v-if="currentSolarTerm" class="day-solar-term">{{ currentSolarTerm }}</span>
-        </div>
+        <span class="day-gregorian">{{ currentDate.getMonth() + 1 }}月{{ currentDate.getDate() }}日</span>
+        <span v-if="currentLunar" class="day-lunar">{{ currentLunar }}</span>
       </div>
-      <div class="day-timeline">
-        <div
-          v-for="hour in hours"
-          :key="hour"
-          class="hour-row"
-          :class="{ 'current-hour': isCurrentHour(hour) }"
-        >
-          <span class="hour-label">{{ hour }}:00</span>
-          <div class="hour-content">
-            <div
-              v-for="task in getHourTasks(hour)"
-              :key="task.id"
-              class="timeline-task"
-              :style="{ backgroundColor: getTaskFirstTagColor(task) }"
-            >
-              <span class="task-tag-name">{{ getTaskFirstTagName(task) }}</span>
-              <span class="task-title">{{ task.title }}</span>
-            </div>
+      <div class="day-content">
+        <div class="task-input-area">
+          <input
+            v-model="newTaskTitle"
+            type="text"
+            placeholder="添加新任务..."
+            @keyup.enter="addTask"
+          />
+          <button @click="addTask" :disabled="!newTaskTitle.trim()">
+            <SvgIcon name="Plus" :size="16" />
+          </button>
+        </div>
+        <div class="day-task-list">
+          <div
+            v-for="task in currentDayTasks"
+            :key="task.id"
+            class="day-task-item"
+            :class="{ done: task.status === 'done' }"
+          >
+            <button class="checkbox" @click="toggleTask(task)">
+              <SvgIcon v-if="task.status === 'done'" name="Check" :size="12" />
+            </button>
+            <span class="task-title">{{ task.title }}</span>
+            <button class="delete-btn" @click="deleteTask(task.id)">
+              <SvgIcon name="Trash" :size="14" />
+            </button>
+          </div>
+          <div v-if="currentDayTasks.length === 0" class="no-tasks">
+            今天还没有任务
           </div>
         </div>
       </div>
@@ -126,145 +111,73 @@
     <div v-else-if="currentView === 'year'" class="year-view">
       <div class="year-grid">
         <div
-          v-for="month in yearMonths"
-          :key="month.value"
+          v-for="month in 12"
+          :key="month"
           class="month-card"
-          :class="{ 'current-month': month.isCurrent }"
-          @click="selectMonth(month.value)"
+          :class="{ 'current-month': isCurrentMonth(month) }"
+          @click="selectMonth(month - 1)"
         >
-          <h4 class="month-name">{{ month.name }}</h4>
-          <div class="month-stats">
-            <span class="task-stat">{{ month.taskCount }} 任务</span>
-          </div>
-          <div class="month-tags" v-if="month.tagColors.length">
-            <span
-              v-for="(color, idx) in month.tagColors.slice(0, 5)"
-              :key="idx"
-              class="tag-dot"
-              :style="{ backgroundColor: color }"
-            ></span>
-          </div>
+          <span class="month-name">{{ month }}月</span>
+          <span class="month-task-count">{{ getMonthTaskCount(month - 1) }} 任务</span>
         </div>
       </div>
     </div>
 
-    <!-- 选中日期的任务详情 -->
-    <div v-if="selectedDate && currentView !== 'year'" class="day-tasks-detail">
-      <div class="detail-header">
-        <div class="detail-title-group">
-          <h3 class="day-tasks-title">{{ selectedDateDisplay }}</h3>
-          <span v-if="selectedLunarDate" class="detail-lunar">{{ selectedLunarDate }}</span>
-        </div>
-        <button class="add-task-btn" @click="showAddTask = true">+ 添加任务</button>
-      </div>
-      <div class="task-list">
-        <div
-          v-for="task in selectedDateTasks"
-          :key="task.id"
-          class="task-item"
-          :class="{ done: task.status === 'done' }"
-        >
-          <div class="task-tags">
-            <span
-              v-for="tag in task.tags"
-              :key="tag.id"
-              class="task-tag"
-              :style="{ backgroundColor: tag.color }"
-            >
-              {{ tag.name }}
-            </span>
-          </div>
-          <div class="task-main">
-            <button
-              class="checkbox"
-              :class="{ checked: task.status === 'done' }"
-              @click="toggleTaskStatus(task)"
-            >
-              <span class="check-icon"></span>
-            </button>
-            <span class="task-title">{{ task.title }}</span>
-          </div>
-        </div>
-        <div v-if="selectedDateTasks.length === 0" class="no-tasks">
-          该日暂无标签任务
-        </div>
-      </div>
-    </div>
-
-    <!-- 添加任务弹窗 -->
-    <div v-if="showAddTask" class="modal-overlay" @click.self="closeAddTask">
-      <div class="modal">
-        <h3>添加标签任务</h3>
-        <div class="form-group">
-          <label>选择标签 (必须)</label>
-          <div class="tag-selector">
-            <button
-              v-for="tag in allTags"
-              :key="tag.id"
-              class="tag-select-btn"
-              :class="{ selected: newTaskTagId === tag.id }"
-              :style="{ backgroundColor: newTaskTagId === tag.id ? tag.color : 'transparent', borderColor: tag.color }"
-              @click="newTaskTagId = tag.id"
-            >
-              {{ tag.name }}
-            </button>
-          </div>
-          <p v-if="allTags.length === 0" class="hint">
-            还没有标签，请先<router-link to="/tags">创建标签</router-link>
-          </p>
-        </div>
-        <div class="form-group">
-          <label>任务内容</label>
+    <!-- 选中日期的任务弹窗 -->
+    <BaseModal
+      v-if="showTaskModal && selectedDate"
+      :is-open="showTaskModal"
+      title="任务详情"
+      @close="showTaskModal = false"
+    >
+      <div class="modal-task-list">
+        <div class="task-input-area">
           <input
             v-model="newTaskTitle"
             type="text"
-            placeholder="输入任务内容..."
-            @keyup.enter="createTask"
+            placeholder="添加新任务..."
+            @keyup.enter="addTaskForDate"
           />
+          <button @click="addTaskForDate" :disabled="!newTaskTitle.trim()">
+            <SvgIcon name="Plus" :size="16" />
+          </button>
         </div>
-        <div class="form-actions">
-          <button class="btn-secondary" @click="closeAddTask">取消</button>
-          <button class="btn-primary" :disabled="!canCreateTask" @click="createTask">创建</button>
+        <div class="tasks-container">
+          <div
+            v-for="task in selectedDateTasks"
+            :key="task.id"
+            class="modal-task-item"
+            :class="{ done: task.status === 'done' }"
+          >
+            <button class="checkbox" @click="toggleTask(task)">
+              <SvgIcon v-if="task.status === 'done'" name="Check" :size="12" />
+            </button>
+            <span class="task-title">{{ task.title }}</span>
+            <button class="delete-btn" @click="deleteTask(task.id)">
+              <SvgIcon name="Trash" :size="14" />
+            </button>
+          </div>
+          <div v-if="selectedDateTasks.length === 0" class="no-tasks-modal">
+            该日暂无任务
+          </div>
         </div>
       </div>
-    </div>
+    </BaseModal>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
-import type { Task, Tag } from '../types'
-import { getTasksByRange, createTask as apiCreateTask, updateTask } from '../api/tasks'
-import { listTags } from '../api/tags'
-import { addTagToTask } from '../api/task_tags'
+import { ref, computed, onMounted } from 'vue'
+import SvgIcon from '../components/icons/SvgIcon.vue'
+import BaseModal from '../components/base/BaseModal.vue'
 
-// 农历数据
-const lunarInfo = [
-  0x04bd8, 0x04ae0, 0x0a570, 0x054d5, 0x0d260, 0x0d950, 0x16554, 0x056a0, 0x09ad0, 0x055d2,
-  0x04ae0, 0x0a5b6, 0x0a4d0, 0x0d250, 0x1d255, 0x0b540, 0x0d6a0, 0x0ada2, 0x095b0, 0x14977,
-  0x04970, 0x0a4b0, 0x0b4b5, 0x06a50, 0x06d40, 0x1ab54, 0x02b60, 0x09570, 0x052f2, 0x04970,
-  0x06566, 0x0d4a0, 0x0ea50, 0x06e95, 0x05ad0, 0x02b60, 0x186e3, 0x092e0, 0x1c8d7, 0x0c950,
-  0x0d4a0, 0x1d8a6, 0x0b550, 0x056a0, 0x1a5b4, 0x025d0, 0x092d0, 0x0d2b2, 0x0a950, 0x0b557,
-  0x06ca0, 0x0b550, 0x15355, 0x04da0, 0x0a5d0, 0x14573, 0x052d0, 0x0a9a8, 0x0e950, 0x06aa0,
-  0x0aea6, 0x0ab50, 0x04b60, 0x0aae4, 0x0a570, 0x05260, 0x0f263, 0x0d950, 0x05b57, 0x056a0,
-  0x096d0, 0x04dd5, 0x04ad0, 0x0a4d0, 0x0d4d4, 0x0d250, 0x0d558, 0x0b540, 0x0b5a0, 0x195a6,
-  0x095b0, 0x049b0, 0x0a974, 0x0a4b0, 0x0b27a, 0x06a50, 0x06d40, 0x0af46, 0x0ab60, 0x09570,
-  0x04af5, 0x04970, 0x064b0, 0x074a3, 0x0ea50, 0x06b58, 0x055c0, 0x0ab60, 0x096d5, 0x092e0,
-  0x0c960, 0x0d954, 0x0d4a0, 0x0da50, 0x07552, 0x056a0, 0x0abb7, 0x025d0, 0x092d0, 0x0cab5,
-  0x0a950, 0x0b4a0, 0x0baa4, 0x0ad50, 0x055d9, 0x04ba0, 0x0a5b0, 0x15176, 0x052b0, 0x0a930,
-  0x07954, 0x06aa0, 0x0ad50, 0x05b52, 0x04b60, 0x0a6e6, 0x0a4e0, 0x0d260, 0x0ea65, 0x0d530,
-  0x05aa0, 0x076a3, 0x096d0, 0x04bd7, 0x04ad0, 0x0a4d0, 0x1d0b6, 0x0d250, 0x0d520, 0x0dd45,
-  0x0b5a0, 0x056d0, 0x055b2, 0x049b0, 0x0a577, 0x0a4b0, 0x0aa50, 0x1b255, 0x06d20, 0x0ada0
-]
-
-const Gan = ['甲', '乙', '丙', '丁', '戊', '己', '庚', '辛', '壬', '癸']
-const Zhi = ['子', '丑', '寅', '卯', '辰', '巳', '午', '未', '申', '酉', '戌', '亥']
-const Animals = ['鼠', '牛', '虎', '兔', '龙', '蛇', '马', '羊', '猴', '鸡', '狗', '猪']
-const solarTerm = ['小寒', '大寒', '立春', '雨水', '惊蛰', '春分', '清明', '谷雨', '立夏', '小满', '芒种', '夏至', '小暑', '大暑', '立秋', '处暑', '白露', '秋分', '寒露', '霜降', '立冬', '小雪', '大雪', '冬至']
-const lunarMonth = ['正', '二', '三', '四', '五', '六', '七', '八', '九', '十', '冬', '腊']
-const lunarDay = ['初一', '初二', '初三', '初四', '初五', '初六', '初七', '初八', '初九', '初十', '十一', '十二', '十三', '十四', '十五', '十六', '十七', '十八', '十九', '二十', '廿一', '廿二', '廿三', '廿四', '廿五', '廿六', '廿七', '廿八', '廿九', '三十']
-const festivals: Record<string, string> = {
-  '1-1': '春节', '1-15': '元宵', '5-5': '端午', '7-7': '七夕', '8-15': '中秋', '9-9': '重阳', '12-8': '腊八', '12-23': '小年', '12-30': '除夕'
+// 类型定义
+interface Task {
+  id: string
+  title: string
+  status: 'pending' | 'done'
+  due_date: string
+  createdAt: string
 }
 
 // 视图类型
@@ -277,312 +190,147 @@ const views = [
 const currentView = ref('month')
 const currentDate = ref(new Date())
 const selectedDate = ref('')
-const selectedTagId = ref<number | null>(null)
-const monthTasks = ref<Task[]>([])
-const allTags = ref<Tag[]>([])
-const showAddTask = ref(false)
+const showTaskModal = ref(false)
 const newTaskTitle = ref('')
-const newTaskTagId = ref<number | null>(null)
+const tasks = ref<Task[]>([])
 
 // 周日开始的星期
 const weekdays = ['日', '一', '二', '三', '四', '五', '六']
-const monthNames = ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月']
+
+// 简单的农历数据（简化版）
+const lunarDays = ['初一', '初二', '初三', '初四', '初五', '初六', '初七', '初八', '初九', '初十',
+  '十一', '十二', '十三', '十四', '十五', '十六', '十七', '十八', '十九', '二十',
+  '廿一', '廿二', '廿三', '廿四', '廿五', '廿六', '廿七', '廿八', '廿九', '三十']
 
 // 计算属性
-const currentYear = computed(() => currentDate.value.getFullYear())
-const currentMonth = computed(() => currentDate.value.getMonth())
-
 const periodDisplay = computed(() => {
   if (currentView.value === 'year') {
-    return `${currentYear.value}年`
+    return `${currentDate.value.getFullYear()}年`
   } else if (currentView.value === 'day') {
     const d = currentDate.value
     return `${d.getMonth() + 1}月${d.getDate()}日`
   }
-  return `${currentYear.value}年${currentMonth.value + 1}月`
+  return `${currentDate.value.getFullYear()}年${currentDate.value.getMonth() + 1}月`
 })
 
-const selectedDateDisplay = computed(() => {
-  if (!selectedDate.value) return ''
-  const date = new Date(selectedDate.value)
-  const lunar = getLunarDate(date)
-  return `${date.getMonth() + 1}月${date.getDate()}日 ${lunar.month}月${lunar.day}`
+const currentLunar = computed(() => {
+  return getSimpleLunar(currentDate.value)
 })
 
-const selectedLunarDate = computed(() => {
-  if (!selectedDate.value) return ''
-  const date = new Date(selectedDate.value)
-  const lunar = getLunarDate(date)
-  return `${lunar.year}年${lunar.month}月${lunar.day}`
-})
-
-const currentLunarDate = computed(() => {
-  const lunar = getLunarDate(currentDate.value)
-  return `${lunar.month}月${lunar.day}`
-})
-
-const currentSolarTerm = computed(() => {
-  return getSolarTerm(currentDate.value)
-})
-
-// 筛选后的任务
-const filteredTasks = computed(() => {
-  if (!selectedTagId.value) return monthTasks.value
-  return monthTasks.value.filter(task =>
-    task.tags?.some(tag => tag.id === selectedTagId.value)
-  )
-})
-
-const selectedDateTasks = computed(() => {
-  return filteredTasks.value.filter(task => task.due_date === selectedDate.value)
-})
-
-const hours = Array.from({ length: 24 }, (_, i) => i)
-
-const canCreateTask = computed(() => newTaskTagId.value && newTaskTitle.value.trim())
-
-// 农历计算函数
-function getLunarDate(date: Date) {
-  const baseDate = new Date(1900, 0, 31)
-  let offset = Math.floor((date.getTime() - baseDate.getTime()) / 86400000)
-  
-  let year = 1900
-  let daysInYear = 0
-  
-  for (year = 1900; year < 2050 && offset > 0; year++) {
-    daysInYear = lYearDays(year)
-    offset -= daysInYear
-  }
-  
-  if (offset < 0) {
-    offset += daysInYear
-    year--
-  }
-  
-  const lunarYear = year
-  let month = 1
-  let leap = leapMonth(year)
-  let isLeap = false
-  let daysInMonth = 0
-  
-  for (month = 1; month < 13 && offset > 0; month++) {
-    if (leap > 0 && month === leap + 1 && !isLeap) {
-      month--
-      isLeap = true
-      daysInMonth = leapDays(year)
-    } else {
-      daysInMonth = monthDays(year, month)
-    }
-    
-    offset -= daysInMonth
-    
-    if (isLeap && month === leap + 1) {
-      isLeap = false
-    }
-  }
-  
-  if (offset === 0 && leap > 0 && month === leap + 1) {
-    if (isLeap) {
-      isLeap = false
-    } else {
-      isLeap = true
-      month--
-    }
-  }
-  
-  if (offset < 0) {
-    offset += daysInMonth
-    month--
-  }
-  
-  const lunarMonth = month
-  const lunarDay = offset + 1
-  
-  return {
-    year: lunarYear,
-    month: isLeap ? '闰' + lunarMonth : lunarMonth,
-    day: lunarDay,
-    dayStr: lunarDay <= 30 ? lunarDay[lunarDay - 1] : ''
-  }
-}
-
-function lYearDays(y: number) {
-  let i, sum = 348
-  for (i = 0x8000; i > 0x8; i >>= 1) {
-    sum += (lunarInfo[y - 1900] & i) ? 1 : 0
-  }
-  return sum + leapDays(y)
-}
-
-function leapDays(y: number) {
-  if (leapMonth(y)) {
-    return (lunarInfo[y - 1900] & 0x10000) ? 30 : 29
-  }
-  return 0
-}
-
-function leapMonth(y: number) {
-  return lunarInfo[y - 1900] & 0xf
-}
-
-function monthDays(y: number, m: number) {
-  return (lunarInfo[y - 1900] & (0x10000 >> m)) ? 30 : 29
-}
-
-// 节气计算
-function getSolarTerm(date: Date) {
-  const y = date.getFullYear()
-  const m = date.getMonth()
-  const d = date.getDate()
-  
-  const termInfo = [
-    6, 20, 4, 19, 6, 21, 5, 20, 6, 21, 6, 21, 7, 23, 8, 23, 8, 23, 9, 24, 8, 23, 7, 22
-  ]
-  
-  const termIndex = m * 2
-  if (d === termInfo[termIndex]) return solarTerm[termIndex]
-  if (d === termInfo[termIndex + 1]) return solarTerm[termIndex + 1]
-  
-  // 检查节日
-  const festivalKey = `${m + 1}-${d}`
-  return festivals[festivalKey] || ''
-}
-
-// 生成日历天数 - 周日开始
 const calendarDays = computed(() => {
   const year = currentDate.value.getFullYear()
   const month = currentDate.value.getMonth()
   const firstDay = new Date(year, month, 1)
   const lastDay = new Date(year, month + 1, 0)
-  
-  // 周日开始：0=周日, 1=周一, ..., 6=周六
-  let firstDayWeek = firstDay.getDay()
-  
+
+  const firstDayWeek = firstDay.getDay()
   const days = []
-  const prevMonthLastDay = new Date(year, month, 0).getDate()
-  
+
   // 上个月的日期
+  const prevMonthLastDay = new Date(year, month, 0).getDate()
   for (let i = firstDayWeek - 1; i >= 0; i--) {
     const day = prevMonthLastDay - i
     const date = new Date(year, month - 1, day)
-    const dateStr = formatDate(date)
-    const lunar = getLunarDate(date)
-    const solarTerm = getSolarTerm(date)
-    days.push({ 
-      day, 
-      dateStr, 
-      isCurrentMonth: false, 
-      isToday: dateStr === formatDate(new Date()),
-      lunarDay: lunar.dayStr,
-      solarTerm,
-      isFestival: !!festivals[`${date.getMonth() + 1}-${date.getDate()}`]
-    })
+    days.push(createDayObj(date, false))
   }
-  
+
   // 当前月的日期
   const today = formatDate(new Date())
   for (let i = 1; i <= lastDay.getDate(); i++) {
     const date = new Date(year, month, i)
-    const dateStr = formatDate(date)
-    const lunar = getLunarDate(date)
-    const solarTerm = getSolarTerm(date)
-    days.push({ 
-      day: i, 
-      dateStr, 
-      isCurrentMonth: true, 
-      isToday: dateStr === today,
-      lunarDay: lunar.dayStr,
-      solarTerm,
-      isFestival: !!festivals[`${month + 1}-${i}`]
-    })
+    days.push(createDayObj(date, true, today))
   }
-  
-  // 下个月的日期
-  const remaining = 42 - days.length
+
+  // 下个月的日期 - 只填充到完整的周
+  const remaining = (7 - (days.length % 7)) % 7
   for (let i = 1; i <= remaining; i++) {
     const date = new Date(year, month + 1, i)
-    const dateStr = formatDate(date)
-    const lunar = getLunarDate(date)
-    const solarTerm = getSolarTerm(date)
-    days.push({ 
-      day: i, 
-      dateStr, 
-      isCurrentMonth: false, 
-      isToday: dateStr === today,
-      lunarDay: lunar.dayStr,
-      solarTerm,
-      isFestival: !!festivals[`${date.getMonth() + 1}-${date.getDate()}`]
-    })
+    days.push(createDayObj(date, false))
   }
+
   return days
 })
 
-// 年视图数据
-const yearMonths = computed(() => {
-  return monthNames.map((name, index) => {
-    const monthTasks = filteredTasks.value.filter(task => {
-      const taskDate = new Date(task.due_date)
-      return taskDate.getMonth() === index && taskDate.getFullYear() === currentYear.value
-    })
-    const tagColors = [...new Set(monthTasks.flatMap(t => t.tags?.map(tag => tag.color) || []))]
-    return {
-      name,
-      value: index,
-      taskCount: monthTasks.length,
-      tagColors,
-      isCurrent: index === new Date().getMonth() && currentYear.value === new Date().getFullYear()
-    }
-  })
+// 将日期按周分组
+const calendarWeeks = computed(() => {
+  const weeks = []
+  const days = calendarDays.value
+  for (let i = 0; i < days.length; i += 7) {
+    weeks.push(days.slice(i, i + 7))
+  }
+  
+  return weeks
 })
 
-// 加载数据
-onMounted(() => {
-  loadTags()
-  loadTasks()
-  selectedDate.value = formatDate(new Date())
+const currentDayTasks = computed(() => {
+  const dateStr = formatDate(currentDate.value)
+  return tasks.value.filter(task => task.due_date === dateStr)
 })
 
-async function loadTags() {
-  try {
-    allTags.value = await listTags()
-  } catch (error) {
-    console.error('加载标签失败:', error)
-  }
-}
+const selectedDateTasks = computed(() => {
+  return tasks.value.filter(task => task.due_date === selectedDate.value)
+})
 
-async function loadTasks() {
-  try {
-    let start, end
-    if (currentView.value === 'year') {
-      start = `${currentYear.value}-01-01`
-      end = `${currentYear.value}-12-31`
-    } else {
-      const { start: s, end: e } = getMonthRange()
-      start = s
-      end = e
-    }
-    monthTasks.value = await getTasksByRange(start, end)
-  } catch (error) {
-    console.error('加载任务失败:', error)
-  }
+// 辅助函数
+function generateId(): string {
+  return Date.now().toString(36) + Math.random().toString(36).substr(2)
 }
 
 function formatDate(date: Date): string {
   return date.toISOString().split('T')[0]
 }
 
-function getMonthRange() {
-  const year = currentDate.value.getFullYear()
-  const month = currentDate.value.getMonth()
+function createDayObj(date: Date, isCurrentMonth: boolean, today?: string) {
+  const dateStr = formatDate(date)
   return {
-    start: formatDate(new Date(year, month, 1)),
-    end: formatDate(new Date(year, month + 1, 0))
+    day: date.getDate(),
+    dateStr,
+    isCurrentMonth,
+    isToday: dateStr === (today || formatDate(new Date())),
+    lunar: getSimpleLunar(date)
   }
+}
+
+// 简化的农历计算（仅显示日期）
+function getSimpleLunar(date: Date): string {
+  // 使用一个简化的偏移计算来模拟农历
+  const baseDate = new Date(2024, 0, 10) // 2024年1月10日是农历初一
+  const diffDays = Math.floor((date.getTime() - baseDate.getTime()) / 86400000)
+  const lunarDayIndex = ((diffDays % 30) + 30) % 30
+  return lunarDays[lunarDayIndex]
+}
+
+function getDayTasks(dateStr: string): Task[] {
+  return tasks.value.filter(task => task.due_date === dateStr)
+}
+
+function getMonthTaskCount(month: number): number {
+  const year = currentDate.value.getFullYear()
+  return tasks.value.filter(task => {
+    const taskDate = new Date(task.due_date)
+    return taskDate.getMonth() === month && taskDate.getFullYear() === year
+  }).length
+}
+
+function isCurrentMonth(month: number): boolean {
+  const now = new Date()
+  return month === now.getMonth() && currentDate.value.getFullYear() === now.getFullYear()
+}
+
+// 方法
+function loadTasks() {
+  const saved = localStorage.getItem('tasks')
+  if (saved) {
+    tasks.value = JSON.parse(saved)
+  }
+}
+
+function saveTasks() {
+  localStorage.setItem('tasks', JSON.stringify(tasks.value))
 }
 
 function switchView(view: string) {
   currentView.value = view
-  loadTasks()
 }
 
 function navigatePrev() {
@@ -595,7 +343,6 @@ function navigatePrev() {
     newDate.setFullYear(newDate.getFullYear() - 1)
   }
   currentDate.value = newDate
-  loadTasks()
 }
 
 function navigateNext() {
@@ -608,104 +355,75 @@ function navigateNext() {
     newDate.setFullYear(newDate.getFullYear() + 1)
   }
   currentDate.value = newDate
-  loadTasks()
 }
 
 function goToToday() {
   currentDate.value = new Date()
   selectedDate.value = formatDate(new Date())
-  loadTasks()
 }
 
 function selectDate(date: { dateStr: string }) {
   selectedDate.value = date.dateStr
-  if (currentView.value === 'month') {
-    currentDate.value = new Date(date.dateStr)
-  }
+  showTaskModal.value = true
+  newTaskTitle.value = ''
 }
 
 function selectMonth(month: number) {
-  currentDate.value = new Date(currentYear.value, month, 1)
+  currentDate.value = new Date(currentDate.value.getFullYear(), month, 1)
   currentView.value = 'month'
-  loadTasks()
 }
 
-function getDayTaskCount(dateStr: string): number {
-  return filteredTasks.value.filter(task => task.due_date === dateStr).length
-}
-
-function getDayTasksPreview(dateStr: string): Task[] {
-  return filteredTasks.value.filter(task => task.due_date === dateStr).slice(0, 3)
-}
-
-function getHourTasks(hour: number): Task[] {
-  const dateStr = formatDate(currentDate.value)
-  return filteredTasks.value.filter(task => {
-    if (task.due_date !== dateStr) return false
-    const taskHour = parseInt(task.due_time?.split(':')[0] || '0')
-    return taskHour === hour
-  })
-}
-
-function isCurrentHour(hour: number): boolean {
-  const now = new Date()
-  return formatDate(now) === formatDate(currentDate.value) && now.getHours() === hour
-}
-
-function getTaskFirstTagColor(task: Task): string {
-  return task.tags?.[0]?.color || 'var(--accent-primary)'
-}
-
-function getTaskFirstTagName(task: Task): string {
-  return task.tags?.[0]?.name || ''
-}
-
-function truncateTitle(title: string): string {
-  return title.length <= 8 ? title : title.slice(0, 8) + '...'
-}
-
-async function toggleTaskStatus(task: Task) {
-  try {
-    const newStatus = task.status === 'done' ? 'pending' : 'done'
-    await updateTask(task.id, { status: newStatus })
-    await loadTasks()
-  } catch (error) {
-    console.error('更新任务失败:', error)
+function addTask() {
+  if (!newTaskTitle.value.trim()) return
+  
+  const newTask: Task = {
+    id: generateId(),
+    title: newTaskTitle.value.trim(),
+    status: 'pending',
+    due_date: formatDate(currentDate.value),
+    createdAt: new Date().toISOString()
   }
-}
-
-function closeAddTask() {
-  showAddTask.value = false
+  
+  tasks.value.push(newTask)
+  saveTasks()
   newTaskTitle.value = ''
-  newTaskTagId.value = null
 }
 
-async function createTask() {
-  if (!canCreateTask.value) return
-  try {
-    const task = await apiCreateTask({
-      title: newTaskTitle.value.trim(),
-      due_date: selectedDate.value,
-      source: 'calendar'
-    })
-    if (newTaskTagId.value) {
-      await addTagToTask(task.id, newTaskTagId.value)
-    }
-    closeAddTask()
-    await loadTasks()
-  } catch (error) {
-    console.error('创建任务失败:', error)
+function addTaskForDate() {
+  if (!newTaskTitle.value.trim() || !selectedDate.value) return
+  
+  const newTask: Task = {
+    id: generateId(),
+    title: newTaskTitle.value.trim(),
+    status: 'pending',
+    due_date: selectedDate.value,
+    createdAt: new Date().toISOString()
   }
+  
+  tasks.value.push(newTask)
+  saveTasks()
+  newTaskTitle.value = ''
 }
 
-watch([currentDate, selectedTagId], () => {
+function toggleTask(task: Task) {
+  task.status = task.status === 'done' ? 'pending' : 'done'
+  saveTasks()
+}
+
+function deleteTask(id: string) {
+  tasks.value = tasks.value.filter(t => t.id !== id)
+  saveTasks()
+}
+
+onMounted(() => {
   loadTasks()
+  selectedDate.value = formatDate(new Date())
 })
 </script>
 
 <style scoped>
 .calendar-view {
-  max-width: 1000px;
+  max-width: 900px;
   margin: 0 auto;
   padding: var(--space-6);
 }
@@ -715,9 +433,9 @@ watch([currentDate, selectedTagId], () => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: var(--space-4);
+  margin-bottom: var(--space-6);
   flex-wrap: wrap;
-  gap: var(--space-3);
+  gap: var(--space-4);
 }
 
 .view-switcher {
@@ -736,6 +454,7 @@ watch([currentDate, selectedTagId], () => {
   border-radius: var(--radius-md);
   cursor: pointer;
   transition: var(--transition-normal);
+  font-size: var(--font-size-sm);
 }
 
 .view-btn.active {
@@ -756,35 +475,16 @@ watch([currentDate, selectedTagId], () => {
   width: 36px;
   height: 36px;
   border: none;
-  background: transparent;
+  background: var(--bg-secondary);
   cursor: pointer;
-  border-radius: var(--radius-full);
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
   transition: var(--transition-normal);
 }
 
 .nav-arrow:hover {
-  background-color: var(--bg-hover);
-}
-
-.arrow-left,
-.arrow-right {
-  display: block;
-  width: 8px;
-  height: 8px;
-  border-style: solid;
-  border-color: var(--text-secondary);
-  border-width: 0 2px 2px 0;
-  transition: var(--transition-normal);
-}
-
-.arrow-left {
-  transform: rotate(135deg);
-  margin-left: 2px;
-}
-
-.arrow-right {
-  transform: rotate(-45deg);
-  margin-right: 2px;
+  background: var(--bg-hover);
+  color: var(--text-primary);
 }
 
 .current-period {
@@ -796,13 +496,14 @@ watch([currentDate, selectedTagId], () => {
 }
 
 .today-btn {
-  padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--border-color);
+  padding: var(--space-2) var(--space-4);
+  border: 1px solid var(--border);
   background: var(--bg-secondary);
   color: var(--text-primary);
   border-radius: var(--radius-md);
   cursor: pointer;
   font-size: var(--font-size-sm);
+  transition: var(--transition-normal);
 }
 
 .today-btn:hover {
@@ -811,83 +512,44 @@ watch([currentDate, selectedTagId], () => {
   border-color: var(--accent-primary);
 }
 
-/* 标签筛选 */
-.tag-filter {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  margin-bottom: var(--space-4);
-  flex-wrap: wrap;
-}
-
-.filter-label {
-  font-size: var(--font-size-sm);
-  color: var(--text-secondary);
-}
-
-.tag-list {
-  display: flex;
-  gap: var(--space-2);
-  flex-wrap: wrap;
-}
-
-.tag-btn {
-  padding: var(--space-1) var(--space-3);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-full);
-  font-size: var(--font-size-sm);
-  cursor: pointer;
-  transition: var(--transition-normal);
-  background: transparent;
-}
-
-.tag-btn.all.active {
-  background: var(--accent-primary);
-  color: white;
-  border-color: var(--accent-primary);
-}
-
-/* 月视图 */
-.weekdays {
-  display: grid;
-  grid-template-columns: repeat(7, 1fr);
-  gap: var(--space-2);
-  margin-bottom: var(--space-2);
-}
-
-.weekday {
-  text-align: center;
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-medium);
-  color: var(--text-secondary);
-  padding: var(--space-2);
-}
-
-.weekday:first-child {
-  color: var(--accent-danger);
-}
-
-.calendar-grid {
-  display: grid;
-  grid-template-columns: repeat(7, 1fr);
-  gap: var(--space-2);
+/* 月视图 - 表格形式 */
+.calendar-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 2px;
   background: var(--bg-card);
   border-radius: var(--radius-lg);
   padding: var(--space-3);
   box-shadow: var(--shadow-card);
 }
 
-.calendar-day {
+.calendar-table thead {
+  background: var(--bg-secondary);
+}
+
+.calendar-table th.weekday {
+  text-align: center;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-secondary);
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+}
+
+.calendar-table th.weekday:first-child {
+  color: var(--accent-danger);
+}
+
+.calendar-table td.calendar-day {
   aspect-ratio: 1;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
+  vertical-align: top;
   padding: var(--space-2);
   border-radius: var(--radius-md);
   cursor: pointer;
   transition: var(--transition-normal);
   min-height: 80px;
-  position: relative;
+  border: 2px solid transparent;
+  background: var(--bg-primary);
 }
 
 .calendar-day:hover {
@@ -899,13 +561,8 @@ watch([currentDate, selectedTagId], () => {
 }
 
 .calendar-day.today {
-  background: var(--accent-primary);
-  color: white;
-}
-
-.calendar-day.today .lunar-day,
-.calendar-day.today .solar-term {
-  color: rgba(255, 255, 255, 0.8);
+  background: var(--accent-primary-light);
+  border-color: var(--accent-primary);
 }
 
 .calendar-day.selected {
@@ -921,6 +578,7 @@ watch([currentDate, selectedTagId], () => {
 .day-number {
   font-weight: var(--font-weight-bold);
   font-size: var(--font-size-md);
+  color: var(--text-primary);
 }
 
 .lunar-day {
@@ -928,75 +586,49 @@ watch([currentDate, selectedTagId], () => {
   color: var(--text-muted);
 }
 
-.lunar-day.lunar-festival {
-  color: var(--accent-danger);
-  font-weight: var(--font-weight-medium);
-}
-
-.day-info {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-height: 32px;
-}
-
-.solar-term {
-  font-size: 10px;
-  color: var(--accent-primary);
-  font-weight: var(--font-weight-medium);
-}
-
-.task-count {
-  font-size: 10px;
-  font-weight: var(--font-weight-bold);
-  color: var(--accent-primary);
-}
-
-.calendar-day.today .task-count {
-  color: white;
-}
-
 .day-tasks {
   display: flex;
-  flex-direction: column;
-  gap: 2px;
+  flex-wrap: wrap;
+  gap: 3px;
   margin-top: auto;
 }
 
-.task-block {
-  padding: 2px 4px;
-  border-radius: 3px;
+.task-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent-primary);
+}
+
+.task-dot.done {
+  background: var(--accent-success);
+}
+
+.more-tasks {
   font-size: 10px;
-  color: white;
-  text-overflow: ellipsis;
-  overflow: hidden;
-  white-space: nowrap;
+  color: var(--text-muted);
+  margin-top: 2px;
 }
 
 /* 日视图 */
 .day-view {
   background: var(--bg-card);
   border-radius: var(--radius-lg);
-  padding: var(--space-3);
+  padding: var(--space-6);
   box-shadow: var(--shadow-card);
 }
 
 .day-header-info {
-  padding: var(--space-4);
-  background: var(--bg-secondary);
-  border-radius: var(--radius-md);
-  margin-bottom: var(--space-4);
-}
-
-.day-date-info {
   display: flex;
   align-items: center;
   gap: var(--space-4);
-  flex-wrap: wrap;
+  margin-bottom: var(--space-6);
+  padding-bottom: var(--space-4);
+  border-bottom: 1px solid var(--border-light);
 }
 
 .day-gregorian {
-  font-size: var(--font-size-xl);
+  font-size: var(--font-size-2xl);
   font-weight: var(--font-weight-bold);
   color: var(--text-primary);
 }
@@ -1005,70 +637,117 @@ watch([currentDate, selectedTagId], () => {
   font-size: var(--font-size-md);
   color: var(--text-secondary);
   padding: var(--space-1) var(--space-3);
-  background: var(--bg-card);
+  background: var(--bg-secondary);
   border-radius: var(--radius-md);
 }
 
-.day-solar-term {
-  font-size: var(--font-size-sm);
-  color: var(--accent-primary);
-  font-weight: var(--font-weight-medium);
-  padding: var(--space-1) var(--space-3);
-  background: var(--accent-primary-light);
-  border-radius: var(--radius-md);
-}
-
-.day-timeline {
-  display: flex;
-  flex-direction: column;
-}
-
-.hour-row {
-  display: flex;
-  min-height: 60px;
-  border-bottom: 1px solid var(--border-light);
-}
-
-.hour-row:last-child {
-  border-bottom: none;
-}
-
-.hour-row.current-hour {
-  background: rgba(var(--accent-primary-rgb), 0.05);
-}
-
-.hour-label {
-  width: 60px;
-  padding: var(--space-2);
-  font-size: var(--font-size-sm);
-  color: var(--text-secondary);
-  text-align: right;
-  border-right: 1px solid var(--border-light);
-}
-
-.hour-content {
-  flex: 1;
-  padding: var(--space-2);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-}
-
-.timeline-task {
-  padding: var(--space-2) var(--space-3);
-  border-radius: var(--radius-md);
-  color: white;
+.task-input-area {
   display: flex;
   gap: var(--space-2);
-  align-items: center;
+  margin-bottom: var(--space-4);
 }
 
-.task-tag-name {
-  font-size: var(--font-size-xs);
-  opacity: 0.9;
-  padding: 2px 6px;
-  background: rgba(255,255,255,0.2);
-  border-radius: var(--radius-sm);
+.task-input-area input {
+  flex: 1;
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-md);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  outline: none;
+}
+
+.task-input-area input:focus {
+  border-color: var(--accent-primary);
+}
+
+.task-input-area button {
+  padding: var(--space-3);
+  background: var(--accent-primary);
+  color: white;
+  border: none;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: var(--transition-normal);
+}
+
+.task-input-area button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.day-task-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.day-task-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  background: var(--bg-primary);
+  border-radius: var(--radius-md);
+  transition: var(--transition-normal);
+}
+
+.day-task-item.done .task-title {
+  text-decoration: line-through;
+  color: var(--text-muted);
+}
+
+.checkbox {
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--border);
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  transition: var(--transition-normal);
+}
+
+.checkbox:hover {
+  border-color: var(--accent-primary);
+}
+
+.day-task-item.done .checkbox {
+  background: var(--accent-success);
+  border-color: var(--accent-success);
+}
+
+.task-title {
+  flex: 1;
+  color: var(--text-primary);
+}
+
+.delete-btn {
+  padding: var(--space-1);
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  opacity: 0;
+  transition: var(--transition-normal);
+}
+
+.day-task-item:hover .delete-btn {
+  opacity: 1;
+}
+
+.delete-btn:hover {
+  color: var(--accent-danger);
+}
+
+.no-tasks {
+  text-align: center;
+  padding: var(--space-8);
+  color: var(--text-muted);
 }
 
 /* 年视图 */
@@ -1086,11 +765,15 @@ watch([currentDate, selectedTagId], () => {
 }
 
 .month-card {
-  padding: var(--space-4);
+  padding: var(--space-6);
   border: 1px solid var(--border-light);
   border-radius: var(--radius-lg);
   cursor: pointer;
   transition: var(--transition-normal);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
 }
 
 .month-card:hover {
@@ -1100,255 +783,51 @@ watch([currentDate, selectedTagId], () => {
 
 .month-card.current-month {
   border-color: var(--accent-primary);
-  background: rgba(var(--accent-primary-rgb), 0.05);
+  background: var(--accent-primary-light);
 }
 
 .month-name {
-  font-size: var(--font-size-lg);
+  font-size: var(--font-size-xl);
   font-weight: var(--font-weight-bold);
   color: var(--text-primary);
-  margin-bottom: var(--space-2);
 }
 
-.month-stats {
+.month-task-count {
   font-size: var(--font-size-sm);
   color: var(--text-secondary);
-  margin-bottom: var(--space-2);
 }
 
-.month-tags {
+/* 弹窗 */
+.modal-task-list {
+  min-width: 400px;
+}
+
+.tasks-container {
+  max-height: 400px;
+  overflow-y: auto;
+  margin-top: var(--space-4);
+}
+
+.modal-task-item {
   display: flex;
-  gap: var(--space-1);
-}
-
-.tag-dot {
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-}
-
-/* 任务详情 */
-.day-tasks-detail {
-  margin-top: var(--space-6);
-  background: var(--bg-card);
-  border-radius: var(--radius-lg);
-  padding: var(--space-4);
-  box-shadow: var(--shadow-card);
-}
-
-.detail-header {
-  display: flex;
-  justify-content: space-between;
   align-items: center;
-  margin-bottom: var(--space-4);
-}
-
-.detail-title-group {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-}
-
-.day-tasks-title {
-  font-size: var(--font-size-lg);
-  font-weight: var(--font-weight-bold);
-  color: var(--text-primary);
-}
-
-.detail-lunar {
-  font-size: var(--font-size-sm);
-  color: var(--text-muted);
-}
-
-.add-task-btn {
-  padding: var(--space-2) var(--space-3);
-  background: var(--accent-primary);
-  color: white;
-  border: none;
-  border-radius: var(--radius-md);
-  cursor: pointer;
-  font-size: var(--font-size-sm);
-}
-
-.task-list {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-}
-
-.task-item {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
+  gap: var(--space-3);
   padding: var(--space-3);
-  background: var(--bg-primary);
+  background: var(--bg-secondary);
   border-radius: var(--radius-md);
+  margin-bottom: var(--space-2);
+  transition: var(--transition-normal);
 }
 
-.task-item.done {
-  opacity: 0.6;
-}
-
-.task-item.done .task-title {
+.modal-task-item.done .task-title {
   text-decoration: line-through;
   color: var(--text-muted);
 }
 
-.task-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-1);
-}
-
-.task-tag {
-  padding: 2px 8px;
-  border-radius: var(--radius-sm);
-  font-size: var(--font-size-xs);
-  color: white;
-}
-
-.task-main {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-}
-
-.checkbox {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 20px;
-  height: 20px;
-  border: 2px solid var(--border);
-  border-radius: 50%;
-  background: transparent;
-  cursor: pointer;
-  flex-shrink: 0;
-}
-
-.checkbox.checked {
-  background: var(--accent-success);
-  border-color: var(--accent-success);
-}
-
-.check-icon {
-  display: block;
-  width: 5px;
-  height: 9px;
-  border-style: solid;
-  border-color: white;
-  border-width: 0 2px 2px 0;
-  transform: rotate(45deg) translate(-1px, -1px);
-}
-
-.task-title {
-  flex: 1;
-  color: var(--text-primary);
-}
-
-.no-tasks {
+.no-tasks-modal {
   text-align: center;
-  padding: var(--space-6);
+  padding: var(--space-8);
   color: var(--text-muted);
-}
-
-/* 弹窗 */
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0,0,0,0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: var(--z-modal);
-}
-
-.modal {
-  background: var(--bg-primary);
-  border-radius: var(--radius-xl);
-  padding: var(--space-6);
-  width: 90%;
-  max-width: 400px;
-}
-
-.modal h3 {
-  margin-bottom: var(--space-4);
-  color: var(--text-primary);
-}
-
-.form-group {
-  margin-bottom: var(--space-4);
-}
-
-.form-group label {
-  display: block;
-  margin-bottom: var(--space-2);
-  font-size: var(--font-size-sm);
-  color: var(--text-secondary);
-}
-
-.form-group input {
-  width: 100%;
-  padding: var(--space-3);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--bg-secondary);
-  color: var(--text-primary);
-}
-
-.tag-selector {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-}
-
-.tag-select-btn {
-  padding: var(--space-2) var(--space-3);
-  border: 1px solid;
-  border-radius: var(--radius-md);
-  cursor: pointer;
-  background: transparent;
-  transition: var(--transition-normal);
-}
-
-.tag-select-btn.selected {
-  color: white;
-}
-
-.hint {
-  margin-top: var(--space-2);
-  font-size: var(--font-size-sm);
-  color: var(--text-secondary);
-}
-
-.form-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--space-3);
-  margin-top: var(--space-4);
-}
-
-.btn-secondary {
-  padding: var(--space-2) var(--space-4);
-  border: 1px solid var(--border);
-  background: transparent;
-  color: var(--text-primary);
-  border-radius: var(--radius-md);
-  cursor: pointer;
-}
-
-.btn-primary {
-  padding: var(--space-2) var(--space-4);
-  border: none;
-  background: var(--accent-primary);
-  color: white;
-  border-radius: var(--radius-md);
-  cursor: pointer;
-}
-
-.btn-primary:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
 }
 
 /* 响应式 */
@@ -1360,6 +839,10 @@ watch([currentDate, selectedTagId], () => {
   .calendar-header {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .nav-section {
+    justify-content: center;
   }
 
   .year-grid {
@@ -1376,9 +859,12 @@ watch([currentDate, selectedTagId], () => {
     padding: var(--space-1);
   }
 
-  .lunar-day,
-  .solar-term {
+  .lunar-day {
     font-size: 9px;
+  }
+
+  .modal-task-list {
+    min-width: auto;
   }
 }
 </style>

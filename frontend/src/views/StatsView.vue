@@ -51,22 +51,54 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import type { StatsData } from '../types'
-import { getStats } from '../api/stats'
+
+// 类型定义
+interface Task {
+  id: string
+  title: string
+  status: 'pending' | 'done'
+  due_date: string
+  createdAt: string
+}
+
+interface DailyStat {
+  date: string
+  completed: number
+}
+
+interface StatsData {
+  total_tasks: number
+  completed_tasks: number
+  completion_rate: number
+  daily_stats: DailyStat[]
+}
 
 // 统计数据
-const stats = ref<StatsData>({
-  total_tasks: 0,
-  completed_tasks: 0,
-  completion_rate: 0,
-  daily_stats: []
-})
-
+const tasks = ref<Task[]>([])
 const weekdays = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
 
 // 计算属性
+const stats = computed<StatsData>(() => {
+  const weekRange = getWeekRange()
+  const weekTasks = tasks.value.filter(task => {
+    const taskDate = new Date(task.due_date)
+    return taskDate >= weekRange.start && taskDate <= weekRange.end
+  })
+
+  const total = weekTasks.length
+  const completed = weekTasks.filter(t => t.status === 'done').length
+  const rate = total > 0 ? Math.round((completed / total) * 100) : 0
+
+  return {
+    total_tasks: total,
+    completed_tasks: completed,
+    completion_rate: rate,
+    daily_stats: getDailyStats(weekRange)
+  }
+})
+
 const dailyStats = computed(() => {
-  return stats.value.daily_stats || []
+  return stats.value.daily_stats
 })
 
 const periodDisplay = computed(() => {
@@ -80,6 +112,42 @@ const periodDisplay = computed(() => {
   return `${format(start)} - ${format(end)}`
 })
 
+// 获取本周日期范围
+function getWeekRange() {
+  const today = new Date()
+  const start = new Date(today)
+  start.setDate(today.getDate() - today.getDay() + 1) // 本周一
+  start.setHours(0, 0, 0, 0)
+
+  const end = new Date(start)
+  end.setDate(start.getDate() + 6) // 本周日
+  end.setHours(23, 59, 59, 999)
+
+  return { start, end }
+}
+
+// 获取每日统计
+function getDailyStats(weekRange: { start: Date; end: Date }): DailyStat[] {
+  const stats: DailyStat[] = []
+
+  for (let i = 0; i < 7; i++) {
+    const date = new Date(weekRange.start)
+    date.setDate(date.getDate() + i)
+    const dateStr = date.toISOString().split('T')[0]
+
+    const completed = tasks.value.filter(task => {
+      return task.due_date === dateStr && task.status === 'done'
+    }).length
+
+    stats.push({
+      date: dateStr,
+      completed
+    })
+  }
+
+  return stats
+}
+
 // 获取柱状图高度
 function getBarHeight(value: number): string {
   const max = Math.max(...dailyStats.value.map(d => d.completed), 1)
@@ -87,28 +155,17 @@ function getBarHeight(value: number): string {
   return `${Math.max(percentage, 5)}%`
 }
 
-// 加载统计数据
-async function loadStats() {
-  try {
-    const today = new Date().toISOString().split('T')[0]
-    const data = await getStats('week', today)
-    stats.value = {
-      total_tasks: data.total_tasks,
-      completed_tasks: data.completed_tasks,
-      completion_rate: data.completion_rate,
-      daily_stats: data.daily_breakdown?.map((d: { date: string; completed: number }) => ({
-        date: d.date,
-        completed: d.completed
-      })) || []
-    }
-  } catch (error) {
-    console.error('加载统计数据失败:', error)
+// 加载任务数据
+function loadTasks() {
+  const saved = localStorage.getItem('tasks')
+  if (saved) {
+    tasks.value = JSON.parse(saved)
   }
 }
 
 // 初始化
 onMounted(() => {
-  loadStats()
+  loadTasks()
 })
 </script>
 

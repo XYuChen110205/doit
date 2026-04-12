@@ -1,56 +1,77 @@
 <template>
   <div class="app">
-    <!-- 顶部导航栏 - 精致毛玻璃效果 -->
+    <!-- 顶部导航栏 -->
     <nav class="navbar">
       <div class="nav-container">
-        <div class="nav-brand">
-          <SvgIcon :name="currentRoleInfo.iconName" :size="20" class="brand-icon" />
-          <span class="brand-text">{{ currentRoleInfo.name }}</span>
+        <!-- Logo -->
+        <div class="nav-brand" @click="goHome">
+          <SvgIcon name="Sparkle" :size="24" />
+          <span class="brand-text">Do It</span>
         </div>
-        <div class="nav-right">
-          <div class="nav-links">
-            <router-link
-              v-for="route in currentRoutes"
-              :key="route.path"
-              :to="route.path"
-              class="nav-link"
-              :class="{ active: $route.path === route.path }"
-            >
-              <SvgIcon v-if="route.meta?.icon" :name="route.meta.icon" :size="16" />
-              {{ route.meta?.title }}
-            </router-link>
-          </div>
-          <!-- 主题切换按钮 -->
+
+        <!-- 主导航 - 核心功能 -->
+        <div class="nav-main">
+          <router-link
+            v-for="route in mainRoutes"
+            :key="route.path"
+            :to="route.path"
+            class="nav-link"
+            :class="{ active: $route.path === route.path }"
+          >
+            <SvgIcon v-if="route.meta?.icon" :name="route.meta.icon" :size="18" />
+            <span>{{ route.meta?.title }}</span>
+          </router-link>
+
+          <!-- 工作模式入口（仅在启用时显示） -->
+          <router-link
+            v-if="currentMode !== 'standard'"
+            :to="modeRoute?.path || '/'"
+            class="nav-link mode-link"
+            :class="{ active: $route.path.startsWith('/' + currentMode) }"
+          >
+            <SvgIcon :name="modeConfig?.icon || 'Settings'" :size="18" />
+            <span>{{ modeConfig?.title }}</span>
+          </router-link>
+        </div>
+
+        <!-- 右侧工具栏 -->
+        <div class="nav-tools">
           <ThemeSwitcher />
-          <!-- 角色切换 -->
-          <div class="role-switcher">
-            <button class="role-btn" @click="showRoleMenu = !showRoleMenu">
-              <SvgIcon :name="currentRoleInfo.iconName" :size="16" />
+
+          <!-- 用户菜单 -->
+          <div class="user-menu">
+            <button class="user-btn" @click="showUserMenu = !showUserMenu">
+              <SvgIcon name="User" :size="18" />
             </button>
-            <div v-if="showRoleMenu" class="role-menu">
-              <button
-                v-for="(info, key) in roleInfo"
-                :key="key"
-                class="role-option"
-                :class="{ active: currentRole === key }"
-                @click="switchRole(key)"
-              >
-                <SvgIcon :name="info.iconName" :size="16" />
-                <span>{{ info.name }}</span>
+            <div v-if="showUserMenu" class="user-dropdown">
+              <div class="user-info">
+                <span class="user-name">{{ userStore.username || '用户' }}</span>
+              </div>
+              <router-link to="/settings" class="dropdown-item" @click="showUserMenu = false">
+                <SvgIcon name="Settings" :size="14" />
+                设置
+              </router-link>
+              <button class="dropdown-item logout" @click="logout">
+                <SvgIcon name="Logout" :size="14" />
+                退出登录
               </button>
             </div>
           </div>
-          <!-- 用户信息 -->
-          <div v-if="userStore.isLoggedIn" class="user-menu">
-            <SvgIcon name="User" :size="16" />
-            <span class="username">{{ userStore.username }}</span>
-            <button class="logout-btn" @click="handleLogout">
-              <SvgIcon name="Logout" :size="14" />
-            </button>
-          </div>
-          <router-link v-else to="/login" class="login-link">
-            <SvgIcon name="User" :size="16" />
-            登录
+        </div>
+      </div>
+
+      <!-- 工作模式子导航 -->
+      <div v-if="currentMode !== 'standard' && modeRoutes.length > 0 && $route.path.startsWith('/' + currentMode)" class="sub-nav">
+        <div class="sub-nav-container">
+          <router-link
+            v-for="route in modeRoutes"
+            :key="route.path"
+            :to="route.path"
+            class="sub-nav-link"
+            :class="{ active: $route.path === route.path }"
+          >
+            <SvgIcon v-if="route.meta?.icon" :name="route.meta.icon" :size="14" />
+            <span>{{ route.meta?.title }}</span>
           </router-link>
         </div>
       </div>
@@ -58,18 +79,16 @@
 
     <!-- 主内容区 -->
     <main class="main-content">
-      <div class="content-wrapper">
-        <router-view />
-      </div>
+      <router-view />
     </main>
 
-    <!-- 移动端底部导航栏 -->
-    <nav class="navbar-mobile">
+    <!-- 移动端底部导航 -->
+    <nav class="mobile-nav">
       <router-link
-        v-for="route in currentRoutes.slice(0, 5)"
+        v-for="route in mobileRoutes"
         :key="route.path"
         :to="route.path"
-        class="nav-link-mobile"
+        class="mobile-nav-item"
         :class="{ active: $route.path === route.path }"
       >
         <SvgIcon v-if="route.meta?.icon" :name="route.meta.icon" :size="20" />
@@ -85,78 +104,81 @@ import { useRoute, useRouter } from 'vue-router'
 import router from './router'
 import ThemeSwitcher from './components/ThemeSwitcher.vue'
 import SvgIcon from './components/icons/SvgIcon.vue'
-import { initTheme } from './styles/themes'
 import { useUserStore } from './stores/user'
 
 const $route = useRoute()
 const $router = useRouter()
 const userStore = useUserStore()
 
-// 当前角色
-const currentRole = ref('default')
-const showRoleMenu = ref(false)
+const showUserMenu = ref(false)
 
-// 角色信息 - 使用 SVG 图标替代 emoji
-const roleInfo: Record<string, { name: string; iconName: string }> = {
-  default: { name: 'Do It', iconName: 'Sparkle' },
-  makeup: { name: '化妆师助手', iconName: 'Makeup' },
-  student: { name: '学习助手', iconName: 'Student' },
-  study: { name: '专注自习', iconName: 'Study' },
-  manager: { name: '店长助手', iconName: 'Manager' },
-  cs_student: { name: '编程助手', iconName: 'Code' },
-  custom: { name: '个人专属', iconName: 'Custom' }
+// 工作模式配置
+const modeConfigs: Record<string, { title: string; icon: string }> = {
+  student: { title: '学生中心', icon: 'Student' },
+  focus: { title: '专注中心', icon: 'Clock' },
+  standard: { title: '标准模式', icon: 'Home' }
 }
 
-// 当前角色信息
-const currentRoleInfo = computed(() => {
-  return roleInfo[currentRole.value] || roleInfo.default
+// 当前工作模式
+const currentMode = computed(() => {
+  return localStorage.getItem('workMode') || 'standard'
 })
 
-// 根据角色获取路由
-const currentRoutes = computed(() => {
-  const allRoutes = router.getRoutes()
-  // 根据角色过滤路由
-  const roleRoutes = allRoutes.filter(route => {
-    if (!route.meta?.title) return false
-    // 默认角色显示所有默认路由
-    if (currentRole.value === 'default') {
-      return ['今日', '收集箱', '日历', '统计', '设置', '诗意写作', '今日手账'].includes(route.meta.title as string)
-    }
-    // 其他角色显示专属路由 + 设置
-    return route.meta.roles?.includes(currentRole.value)
-  })
-  return roleRoutes
+// 当前模式配置
+const modeConfig = computed(() => {
+  return modeConfigs[currentMode.value]
 })
 
-// 加载角色
-function loadRole() {
-  const savedRole = localStorage.getItem('userRole')
-  if (savedRole && roleInfo[savedRole]) {
-    currentRole.value = savedRole
+// 主功能路由（今日、收集箱、日历、笔记、统计）
+const mainRoutes = computed(() => {
+  return router.getRoutes()
+    .filter(route => route.meta?.group === 'main')
+    .sort((a, b) => (a.meta?.order as number) - (b.meta?.order as number))
+})
+
+// 当前工作模式的首页路由
+const modeRoute = computed(() => {
+  return router.getRoutes().find(r => r.meta?.group === 'mode' && r.meta?.mode === currentMode.value && r.meta?.order === 1)
+})
+
+// 当前工作模式的子路由
+const modeRoutes = computed(() => {
+  return router.getRoutes()
+    .filter(route => route.meta?.group === 'mode' && route.meta?.mode === currentMode.value)
+    .sort((a, b) => (a.meta?.order as number) - (b.meta?.order as number))
+})
+
+// 移动端导航
+const mobileRoutes = computed(() => {
+  const routes = mainRoutes.value.slice(0, 4)
+  // 如果启用了工作模式，添加模式入口
+  if (currentMode.value !== 'standard' && modeRoute.value) {
+    routes.push(modeRoute.value)
   }
-}
+  return routes
+})
 
-// 切换角色
-function switchRole(role: string) {
-  currentRole.value = role
-  localStorage.setItem('userRole', role)
-  showRoleMenu.value = false
-  // 切换到对应角色的首页
+// 返回首页
+function goHome() {
   $router.push('/')
 }
 
-// 点击外部关闭角色菜单
+// 退出登录
+function logout() {
+  userStore.logout()
+  showUserMenu.value = false
+  $router.push('/login')
+}
+
+// 点击外部关闭用户菜单
 function handleClickOutside(event: MouseEvent) {
   const target = event.target as HTMLElement
-  if (!target.closest('.role-switcher')) {
-    showRoleMenu.value = false
+  if (!target.closest('.user-menu')) {
+    showUserMenu.value = false
   }
 }
 
-// 初始化
 onMounted(() => {
-  loadRole()
-  initTheme()
   userStore.init()
   document.addEventListener('click', handleClickOutside)
 })
@@ -164,12 +186,6 @@ onMounted(() => {
 onUnmounted(() => {
   document.removeEventListener('click', handleClickOutside)
 })
-
-// 退出登录
-function handleLogout() {
-  userStore.logout()
-  $router.push('/login')
-}
 </script>
 
 <style>
@@ -181,10 +197,10 @@ function handleLogout() {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
+  background: var(--bg-primary);
 }
 
-/* ========== 顶部导航栏 - 精致毛玻璃效果 ========== */
+/* ========== 顶部导航栏 ========== */
 .navbar {
   position: fixed;
   top: 0;
@@ -193,7 +209,6 @@ function handleLogout() {
   z-index: var(--z-nav);
   background: var(--bg-nav);
   backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
   border-bottom: 1px solid var(--border-light);
   box-shadow: var(--shadow-nav);
 }
@@ -204,21 +219,23 @@ function handleLogout() {
   justify-content: space-between;
   max-width: 1400px;
   margin: 0 auto;
-  padding: 0 var(--space-8);
-  height: 72px;
+  padding: 0 var(--space-6);
+  height: 64px;
 }
 
+/* Logo */
 .nav-brand {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
+  gap: var(--space-2);
   font-size: var(--font-size-xl);
   font-weight: var(--font-weight-bold);
   color: var(--text-primary);
-  letter-spacing: var(--letter-spacing-tight);
+  cursor: pointer;
+  transition: var(--transition-normal);
 }
 
-.brand-icon {
+.nav-brand:hover {
   color: var(--accent-primary);
 }
 
@@ -229,26 +246,20 @@ function handleLogout() {
   background-clip: text;
 }
 
-.nav-right {
+/* 主导航 */
+.nav-main {
   display: flex;
   align-items: center;
-  gap: var(--space-4);
-}
-
-.nav-links {
-  display: flex;
-  gap: var(--space-2);
+  gap: var(--space-1);
 }
 
 .nav-link {
-  position: relative;
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  padding: var(--space-3) var(--space-4);
+  padding: var(--space-2) var(--space-4);
   font-size: var(--font-size-md);
   font-weight: var(--font-weight-medium);
-  letter-spacing: var(--letter-spacing-normal);
   color: var(--text-secondary);
   text-decoration: none;
   border-radius: var(--radius-md);
@@ -265,12 +276,36 @@ function handleLogout() {
   background: var(--accent-primary-light);
 }
 
-/* 角色切换器 */
-.role-switcher {
+.nav-link.mode-link {
+  position: relative;
+  margin-left: var(--space-2);
+  padding-left: var(--space-4);
+}
+
+.nav-link.mode-link::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 1px;
+  height: 20px;
+  background: var(--border);
+}
+
+/* 右侧工具栏 */
+.nav-tools {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+/* 用户菜单 */
+.user-menu {
   position: relative;
 }
 
-.role-btn {
+.user-btn {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -285,12 +320,12 @@ function handleLogout() {
   transition: var(--transition-normal);
 }
 
-.role-btn:hover {
+.user-btn:hover {
   background: var(--bg-hover);
-  color: var(--accent-primary);
+  color: var(--text-primary);
 }
 
-.role-menu {
+.user-dropdown {
   position: absolute;
   top: 100%;
   right: 0;
@@ -299,17 +334,29 @@ function handleLogout() {
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-float);
-  padding: var(--space-2);
   min-width: 160px;
   z-index: var(--z-dropdown);
+  padding: var(--space-2);
 }
 
-.role-option {
+.user-info {
+  padding: var(--space-3);
+  border-bottom: 1px solid var(--border-light);
+  margin-bottom: var(--space-2);
+}
+
+.user-name {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-primary);
+}
+
+.dropdown-item {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
+  gap: var(--space-2);
   width: 100%;
-  padding: var(--space-3) var(--space-4);
+  padding: var(--space-2) var(--space-3);
   background: none;
   border: none;
   border-radius: var(--radius-md);
@@ -317,88 +364,68 @@ function handleLogout() {
   color: var(--text-secondary);
   cursor: pointer;
   transition: var(--transition-normal);
-  text-align: left;
+  text-decoration: none;
 }
 
-.role-option:hover {
+.dropdown-item:hover {
   background: var(--bg-hover);
   color: var(--text-primary);
 }
 
-.role-option.active {
-  background: var(--accent-primary-light);
-  color: var(--accent-primary);
+.dropdown-item.logout:hover {
+  background: rgba(229, 115, 115, 0.1);
+  color: var(--accent-danger);
 }
 
-/* 用户菜单 */
-.user-menu {
+/* 子导航 */
+.sub-nav {
+  background: var(--bg-secondary);
+  border-top: 1px solid var(--border-light);
+}
+
+.sub-nav-container {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: var(--space-2) var(--space-6);
+  height: 44px;
+}
+
+.sub-nav-link {
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  padding-left: var(--space-4);
-  border-left: 1px solid var(--border-light);
-  color: var(--text-secondary);
-}
-
-.username {
+  padding: var(--space-2) var(--space-3);
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-medium);
   color: var(--text-secondary);
-}
-
-.logout-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  padding: 0;
-  background: var(--bg-secondary);
-  border: none;
-  border-radius: var(--radius-md);
-  color: var(--text-secondary);
-  cursor: pointer;
-  transition: var(--transition-normal);
-}
-
-.logout-btn:hover {
-  background: var(--accent-danger);
-  color: white;
-}
-
-.login-link {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-2) var(--space-4);
-  background: var(--accent-primary);
-  color: white;
   text-decoration: none;
   border-radius: var(--radius-md);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-medium);
   transition: var(--transition-normal);
 }
 
-.login-link:hover {
-  background: var(--accent-primary-hover);
+.sub-nav-link:hover {
+  color: var(--text-primary);
+  background: var(--bg-hover);
 }
 
-/* ========== 主内容区 ========== */
+.sub-nav-link.active {
+  color: var(--accent-primary);
+  background: var(--accent-primary-light);
+}
+
+/* 主内容区 */
 .main-content {
   flex: 1;
-  margin-top: 72px;
-  padding: var(--space-8);
+  margin-top: 64px;
+  padding: var(--space-6);
   overflow: auto;
 }
 
-.content-wrapper {
-  max-width: 1400px;
-  margin: 0 auto;
-}
-
-/* ========== 移动端底部导航栏 ========== */
-.navbar-mobile {
+/* 移动端底部导航 */
+.mobile-nav {
   display: none;
   position: fixed;
   bottom: 0;
@@ -407,13 +434,12 @@ function handleLogout() {
   z-index: var(--z-nav);
   background: var(--bg-nav);
   backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
   border-top: 1px solid var(--border-light);
   box-shadow: 0 -2px 12px rgba(26, 43, 60, 0.08);
   padding: var(--space-2) 0 calc(var(--space-2) + env(safe-area-inset-bottom));
 }
 
-.nav-link-mobile {
+.mobile-nav-item {
   flex: 1;
   display: flex;
   flex-direction: column;
@@ -423,14 +449,13 @@ function handleLogout() {
   padding: var(--space-2) var(--space-1);
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-medium);
-  letter-spacing: var(--letter-spacing-normal);
   color: var(--text-secondary);
   text-decoration: none;
   transition: var(--transition-normal);
   position: relative;
 }
 
-.nav-link-mobile::before {
+.mobile-nav-item::before {
   content: '';
   position: absolute;
   top: 0;
@@ -443,39 +468,44 @@ function handleLogout() {
   transition: var(--transition-normal);
 }
 
-.nav-link-mobile.active {
+.mobile-nav-item.active {
   color: var(--accent-primary);
 }
 
-.nav-link-mobile.active::before {
+.mobile-nav-item.active::before {
   transform: translateX(-50%) scaleX(1);
 }
 
-/* ========== 响应式适配 ========== */
-@media (max-width: 768px) {
-  .navbar {
+/* 响应式适配 */
+@media (max-width: 1024px) {
+  .nav-main {
     display: none;
   }
 
-  .navbar-mobile {
+  .main-content {
+    margin-top: 64px;
+    margin-bottom: 64px;
+  }
+
+  .mobile-nav {
     display: flex;
     justify-content: space-around;
   }
+}
 
-  .main-content {
-    margin-top: 0;
-    margin-bottom: 64px;
-    padding: var(--space-5);
+@media (max-width: 768px) {
+  .nav-container {
+    padding: 0 var(--space-4);
   }
 
-  .content-wrapper {
-    max-width: 100%;
+  .main-content {
+    padding: var(--space-4);
   }
 }
 
 @media (max-width: 480px) {
   .main-content {
-    padding: var(--space-4);
+    padding: var(--space-3);
   }
 }
 </style>

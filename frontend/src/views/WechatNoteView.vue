@@ -1,7 +1,7 @@
 <template>
   <div class="wechat-note-view">
     <!-- 左侧群聊列表 -->
-    <div class="sidebar" :class="{ collapsed: isSidebarCollapsed }">
+    <div class="sidebar">
       <div class="sidebar-header">
         <h2 class="sidebar-title">
           <SvgIcon name="Note" :size="20" />
@@ -17,7 +17,7 @@
           v-for="group in groups"
           :key="group.id"
           class="group-item"
-          :class="{ active: currentGroup?.id === group.id, pinned: group.isPinned }"
+          :class="{ active: currentGroup?.id === group.id }"
           @click="selectGroup(group)"
         >
           <div class="group-avatar">
@@ -27,19 +27,9 @@
             <span class="group-name">{{ group.name }}</span>
             <span class="group-desc" v-if="group.description">{{ group.description }}</span>
           </div>
-          <div class="group-actions" @click.stop>
-            <button 
-              class="action-btn pin" 
-              :class="{ pinned: group.isPinned }"
-              @click="togglePin(group)"
-              title="置顶"
-            >
-              <SvgIcon name="Pin" :size="14" />
-            </button>
-            <button class="action-btn delete" @click="confirmDeleteGroup(group)" title="删除">
-              <SvgIcon name="Trash" :size="14" />
-            </button>
-          </div>
+          <button class="delete-btn" @click.stop="deleteGroup(group.id)">
+            <SvgIcon name="Trash" :size="14" />
+          </button>
         </div>
 
         <!-- 空状态 -->
@@ -50,12 +40,6 @@
             创建一个
           </button>
         </div>
-      </div>
-
-      <!-- 素材库入口 -->
-      <div class="material-library-entry" @click="showMaterialLibrary = true">
-        <SvgIcon name="Folder" :size="18" />
-        <span>素材库</span>
       </div>
     </div>
 
@@ -96,7 +80,7 @@
           </button>
         </div>
         <div
-          v-for="record in memberRecords"
+          v-for="record in getMemberRecords(currentMember.id)"
           :key="record.id"
           class="record-item"
           :class="{ active: currentRecord?.id === record.id }"
@@ -105,12 +89,12 @@
           <div class="record-title">{{ record.title || '无标题' }}</div>
           <div class="record-meta">
             <span class="record-date">{{ formatDate(record.updatedAt) }}</span>
-            <button class="delete-record-btn" @click.stop="confirmDeleteRecord(record)" title="删除">
+            <button class="delete-record-btn" @click.stop="deleteRecord(record.id)">
               <SvgIcon name="Trash" :size="12" />
             </button>
           </div>
         </div>
-        <div v-if="memberRecords.length === 0" class="empty-records">
+        <div v-if="getMemberRecords(currentMember.id).length === 0" class="empty-records">
           <p>还没有记录</p>
           <button class="create-record-btn" @click="createNewRecord">
             创建第一条
@@ -120,7 +104,7 @@
     </div>
 
     <!-- 右侧编辑器区域 -->
-    <div class="editor-area" v-if="currentMember">
+    <div class="editor-area" v-if="currentMember && currentRecord">
       <div class="editor-header">
         <div class="editor-info">
           <span class="member-badge" :style="{ backgroundColor: currentMember.editorConfig.backgroundColor }">
@@ -128,11 +112,10 @@
             {{ currentMember.name }}
           </span>
           <input
-            v-if="currentRecord"
             v-model="currentRecord.title"
             class="title-input"
             placeholder="输入标题..."
-            @blur="saveRecord"
+            @blur="saveData"
           />
         </div>
         <div class="editor-actions">
@@ -141,40 +124,20 @@
             <SvgIcon v-else-if="saveStatus === 'saved'" name="Check" :size="14" />
             {{ saveStatusText }}
           </span>
-          <button class="action-btn" @click="showMemberSettings = true" title="编辑器设置">
-            <SvgIcon name="Settings" :size="16" />
+          <button class="action-btn" @click="showBackgroundPicker = true" title="更换背景">
+            <SvgIcon name="Palette" :size="16" />
           </button>
         </div>
       </div>
 
       <!-- 编辑器容器 -->
-      <div 
-        class="editor-container"
-        :style="editorContainerStyle"
-      >
-        <!-- 代码编辑器 -->
-        <CodeEditor
-          v-if="currentMember.editorType === 'code'"
+      <div class="editor-container" :style="editorContainerStyle">
+        <textarea
           v-model="editorContent"
-          :config="currentMember.editorConfig"
-          @change="onContentChange"
-        />
-        
-        <!-- Markdown编辑器 -->
-        <MarkdownEditor
-          v-else-if="currentMember.editorType === 'markdown'"
-          v-model="editorContent"
-          :config="currentMember.editorConfig"
-          @change="onContentChange"
-        />
-        
-        <!-- 普通文本编辑器 -->
-        <TextEditor
-          v-else
-          v-model="editorContent"
-          :config="currentMember.editorConfig"
-          @change="onContentChange"
-        />
+          class="editor-textarea"
+          placeholder="开始写作..."
+          @input="onContentChange"
+        ></textarea>
       </div>
     </div>
 
@@ -186,7 +149,12 @@
     </div>
 
     <!-- 创建群聊弹窗 -->
-    <BaseModal v-model="showCreateGroup" title="新建记录本">
+    <BaseModal
+      v-if="showCreateGroup"
+      :is-open="showCreateGroup"
+      title="新建记录本"
+      @close="showCreateGroup = false"
+    >
       <div class="form-group">
         <label>名称</label>
         <input v-model="newGroupName" placeholder="如：学习笔记、代码片段..." />
@@ -196,13 +164,18 @@
         <input v-model="newGroupDesc" placeholder="简单描述这个记录本的用途..." />
       </div>
       <template #footer>
-        <BaseButton variant="secondary" @click="showCreateGroup = false">取消</BaseButton>
-        <BaseButton @click="createGroup" :disabled="!newGroupName.trim()">创建</BaseButton>
+        <button class="btn-secondary" @click="showCreateGroup = false">取消</button>
+        <button class="btn-primary" @click="createGroup" :disabled="!newGroupName.trim()">创建</button>
       </template>
     </BaseModal>
 
     <!-- 添加成员弹窗 -->
-    <BaseModal v-model="showAddMember" title="添加成员">
+    <BaseModal
+      v-if="showAddMember"
+      :is-open="showAddMember"
+      title="添加成员"
+      @close="showAddMember = false"
+    >
       <div class="member-type-list">
         <div
           v-for="config in availableEditorTypes"
@@ -225,76 +198,163 @@
         <input v-model="newMemberName" :placeholder="getDefaultMemberName(selectedEditorType)" />
       </div>
       <template #footer>
-        <BaseButton variant="secondary" @click="showAddMember = false">取消</BaseButton>
-        <BaseButton @click="addMember" :disabled="!selectedEditorType || !newMemberName.trim()">添加</BaseButton>
+        <button class="btn-secondary" @click="showAddMember = false">取消</button>
+        <button class="btn-primary" @click="addMember" :disabled="!selectedEditorType || !newMemberName.trim()">添加</button>
       </template>
     </BaseModal>
 
-    <!-- 删除确认弹窗 -->
-    <BaseModal v-model="showDeleteConfirm" :title="deleteConfirmTitle">
-      <p>{{ deleteConfirmMessage }}</p>
-      <template #footer>
-        <BaseButton variant="secondary" @click="showDeleteConfirm = false">取消</BaseButton>
-        <BaseButton variant="danger" @click="executeDelete">删除</BaseButton>
-      </template>
+    <!-- 背景选择弹窗 -->
+    <BaseModal
+      v-if="showBackgroundPicker"
+      :is-open="showBackgroundPicker"
+      title="选择背景"
+      @close="showBackgroundPicker = false"
+    >
+      <div class="background-options">
+        <div
+          v-for="bg in backgroundOptions"
+          :key="bg.name"
+          class="bg-option"
+          :class="{ active: currentBg === bg.name }"
+          @click="selectBackground(bg)"
+        >
+          <div class="bg-preview" :style="bg.style"></div>
+          <span class="bg-name">{{ bg.label }}</span>
+        </div>
+      </div>
     </BaseModal>
-
-    <!-- 素材库弹窗 -->
-    <MaterialLibraryModal
-      v-model="showMaterialLibrary"
-      @select="insertMaterial"
-    />
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
-import type { ChatGroup, ChatMember, ChatRecord, EditorConfig } from '../types/wechat-note'
-import { EditorType, EDITOR_CONFIGS, DEFAULT_MEMBERS } from '../types/wechat-note'
-import {
-  listChatGroups,
-  createChatGroup,
-  updateChatGroup,
-  deleteChatGroup,
-  addChatMember,
-  getChatRecordsByMember,
-  createChatRecord,
-  updateChatRecord,
-  deleteChatRecord
-} from '../api/chat-groups'
 import SvgIcon from '../components/icons/SvgIcon.vue'
 import BaseModal from '../components/base/BaseModal.vue'
-import BaseButton from '../components/base/BaseButton.vue'
-import CodeEditor from '../components/editors/CodeEditor.vue'
-import MarkdownEditor from '../components/editors/MarkdownEditor.vue'
-import TextEditor from '../components/editors/TextEditor.vue'
-import MaterialLibraryModal from '../components/MaterialLibraryModal.vue'
+
+// 类型定义
+interface EditorConfig {
+  type: string
+  name: string
+  icon: string
+  backgroundColor: string
+  textColor: string
+  fontFamily: string
+  fontSize: string
+  lineHeight: string
+  padding: string
+  borderRadius: string
+}
+
+interface ChatMember {
+  id: string
+  name: string
+  editorType: string
+  editorConfig: EditorConfig
+}
+
+interface ChatRecord {
+  id: string
+  memberId: string
+  title: string
+  content: string
+  updatedAt: string
+}
+
+interface ChatGroup {
+  id: string
+  name: string
+  description: string
+  members: ChatMember[]
+}
+
+// 编辑器类型配置
+const EDITOR_CONFIGS: Record<string, EditorConfig> = {
+  text: {
+    type: 'text',
+    name: '文本',
+    icon: 'Document',
+    backgroundColor: '#faf8f5',
+    textColor: '#333',
+    fontFamily: 'Georgia, serif',
+    fontSize: '16px',
+    lineHeight: '1.8',
+    padding: '24px',
+    borderRadius: '8px'
+  },
+  code: {
+    type: 'code',
+    name: '代码',
+    icon: 'Code',
+    backgroundColor: '#1e1e1e',
+    textColor: '#d4d4d4',
+    fontFamily: 'Consolas, monospace',
+    fontSize: '14px',
+    lineHeight: '1.5',
+    padding: '20px',
+    borderRadius: '8px'
+  },
+  markdown: {
+    type: 'markdown',
+    name: 'Markdown',
+    icon: 'Document',
+    backgroundColor: '#ffffff',
+    textColor: '#333',
+    fontFamily: 'system-ui, sans-serif',
+    fontSize: '16px',
+    lineHeight: '1.6',
+    padding: '24px',
+    borderRadius: '8px'
+  },
+  lined: {
+    type: 'lined',
+    name: '横线纸',
+    icon: 'Note',
+    backgroundColor: '#faf8f5',
+    textColor: '#333',
+    fontFamily: 'Georgia, serif',
+    fontSize: '16px',
+    lineHeight: '28px',
+    padding: '24px',
+    borderRadius: '8px'
+  }
+}
+
+// 背景选项
+const backgroundOptions = [
+  { name: 'default', label: '默认', style: { background: '#faf8f5' } },
+  { name: 'white', label: '纯白', style: { background: '#ffffff' } },
+  { name: 'cream', label: '米色', style: { background: '#f5f5dc' } },
+  { name: 'light-blue', label: '淡蓝', style: { background: '#e3f2fd' } },
+  { name: 'light-green', label: '淡绿', style: { background: '#e8f5e9' } },
+  { name: 'light-pink', label: '淡粉', style: { background: '#fce4ec' } },
+  { name: 'dark', label: '深色', style: { background: '#2d2d2d' } },
+  { name: 'lined', label: '横线纸', style: { 
+    background: '#faf8f5',
+    backgroundImage: 'repeating-linear-gradient(transparent, transparent 27px, #e0e0e0 27px, #e0e0e0 28px)',
+    backgroundAttachment: 'local'
+  }}
+]
 
 // 状态
 const groups = ref<ChatGroup[]>([])
+const records = ref<ChatRecord[]>([])
 const currentGroup = ref<ChatGroup | null>(null)
 const currentMember = ref<ChatMember | null>(null)
 const currentRecord = ref<ChatRecord | null>(null)
-const memberRecords = ref<ChatRecord[]>([])
 const editorContent = ref('')
 const saveStatus = ref<'idle' | 'saving' | 'saved'>('idle')
-const isSidebarCollapsed = ref(false)
+const currentBg = ref('default')
 
 // 弹窗状态
 const showCreateGroup = ref(false)
 const showAddMember = ref(false)
-const showDeleteConfirm = ref(false)
-const showMaterialLibrary = ref(false)
-const showMemberSettings = ref(false)
+const showBackgroundPicker = ref(false)
 
 // 表单数据
 const newGroupName = ref('')
 const newGroupDesc = ref('')
-const selectedEditorType = ref<EditorType | null>(null)
+const selectedEditorType = ref<string | null>(null)
 const newMemberName = ref('')
-
-// 删除相关
-const deleteTarget = ref<{ type: 'group' | 'record', data: any } | null>(null)
 
 // 自动保存定时器
 let saveTimer: ReturnType<typeof setTimeout> | null = null
@@ -304,190 +364,196 @@ let autoSaveTimer: ReturnType<typeof setTimeout> | null = null
 const editorContainerStyle = computed(() => {
   if (!currentMember.value) return {}
   const config = currentMember.value.editorConfig
-  return {
-    backgroundColor: config.backgroundColor,
+  const bg = backgroundOptions.find(b => b.name === currentBg.value)
+  
+  const baseStyle: Record<string, string> = {
     color: config.textColor,
     fontFamily: config.fontFamily,
     fontSize: config.fontSize,
     lineHeight: config.lineHeight,
     padding: config.padding,
-    borderRadius: config.borderRadius
+    borderRadius: config.borderRadius,
+  }
+  
+  // 如果是横线背景，使用横线样式
+  if (currentBg.value === 'lined') {
+    return {
+      ...baseStyle,
+      backgroundColor: '#faf8f5',
+      backgroundImage: 'repeating-linear-gradient(transparent, transparent 27px, #e0e0e0 27px, #e0e0e0 28px)',
+      backgroundAttachment: 'local',
+      minHeight: '400px'
+    }
+  }
+  
+  return {
+    ...baseStyle,
+    backgroundColor: bg?.style?.background || config.backgroundColor,
+    minHeight: '400px'
   }
 })
 
 const saveStatusText = computed(() => {
   if (saveStatus.value === 'saving') return '保存中...'
   if (saveStatus.value === 'saved') return '已保存'
-  return '自动保存'
+  return ''
 })
 
 const availableEditorTypes = computed(() => {
   return Object.values(EDITOR_CONFIGS)
 })
 
-const deleteConfirmTitle = computed(() => {
-  if (!deleteTarget.value) return ''
-  return deleteTarget.value.type === 'group' ? '删除记录本' : '删除记录'
-})
-
-const deleteConfirmMessage = computed(() => {
-  if (!deleteTarget.value) return ''
-  if (deleteTarget.value.type === 'group') {
-    return `确定要删除 "${deleteTarget.value.data.name}" 吗？其中的所有记录都将被删除。`
-  }
-  return '确定要删除这条记录吗？删除后无法恢复。'
-})
-
 // 方法
-async function loadGroups() {
-  groups.value = await listChatGroups()
+function generateId(): string {
+  return Date.now().toString(36) + Math.random().toString(36).substr(2)
+}
+
+function loadData() {
+  const savedGroups = localStorage.getItem('chatGroups')
+  const savedRecords = localStorage.getItem('chatRecords')
+  
+  if (savedGroups) {
+    groups.value = JSON.parse(savedGroups)
+  }
+  if (savedRecords) {
+    records.value = JSON.parse(savedRecords)
+  }
+}
+
+function saveData() {
+  localStorage.setItem('chatGroups', JSON.stringify(groups.value))
+  localStorage.setItem('chatRecords', JSON.stringify(records.value))
+  saveStatus.value = 'saved'
+  if (saveTimer) clearTimeout(saveTimer)
+  saveTimer = setTimeout(() => {
+    saveStatus.value = 'idle'
+  }, 2000)
+}
+
+function getMemberRecords(memberId: string): ChatRecord[] {
+  return records.value
+    .filter(r => r.memberId === memberId)
+    .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
 }
 
 function selectGroup(group: ChatGroup) {
   currentGroup.value = group
   currentMember.value = null
   currentRecord.value = null
-  memberRecords.value = []
   editorContent.value = ''
 }
 
-async function selectMember(member: ChatMember) {
+function selectMember(member: ChatMember) {
   currentMember.value = member
   currentRecord.value = null
   editorContent.value = ''
   
   // 加载该成员的记录
-  memberRecords.value = await getChatRecordsByMember(member.id)
+  const memberRecords = getMemberRecords(member.id)
   
   // 如果有记录，默认选中第一条
-  if (memberRecords.value.length > 0) {
-    selectRecord(memberRecords.value[0])
+  if (memberRecords.length > 0) {
+    selectRecord(memberRecords[0])
   } else {
     // 没有记录则创建新记录
     createNewRecord()
   }
 }
 
-async function selectRecord(record: ChatRecord) {
+function selectRecord(record: ChatRecord) {
   currentRecord.value = record
   editorContent.value = record.content
   saveStatus.value = 'idle'
 }
 
-async function createNewRecord() {
+function createNewRecord() {
   if (!currentGroup.value || !currentMember.value) return
   
-  const record = await createChatRecord({
-    groupId: currentGroup.value.id,
+  const newRecord: ChatRecord = {
+    id: generateId(),
     memberId: currentMember.value.id,
-    content: '',
     title: '',
-    tags: []
-  })
+    content: '',
+    updatedAt: new Date().toISOString()
+  }
   
-  memberRecords.value.unshift(record)
-  selectRecord(record)
+  records.value.push(newRecord)
+  saveData()
+  selectRecord(newRecord)
 }
 
-async function createGroup() {
+function createGroup() {
   if (!newGroupName.value.trim()) return
   
-  const group = await createChatGroup(newGroupName.value.trim(), newGroupDesc.value.trim())
-  groups.value.push(group)
-  selectGroup(group)
+  const newGroup: ChatGroup = {
+    id: generateId(),
+    name: newGroupName.value.trim(),
+    description: newGroupDesc.value.trim(),
+    members: []
+  }
+  
+  groups.value.push(newGroup)
+  saveData()
+  selectGroup(newGroup)
   
   showCreateGroup.value = false
   newGroupName.value = ''
   newGroupDesc.value = ''
 }
 
-async function addMember() {
+function addMember() {
   if (!currentGroup.value || !selectedEditorType.value || !newMemberName.value.trim()) return
   
   const config = EDITOR_CONFIGS[selectedEditorType.value]
-  const member = await addChatMember(currentGroup.value.id, {
+  const newMember: ChatMember = {
+    id: generateId(),
     name: newMemberName.value.trim(),
     editorType: selectedEditorType.value,
-    editorConfig: config,
-    isDefault: false,
-    order: currentGroup.value.members.length + 1
-  })
+    editorConfig: { ...config }
+  }
   
-  currentGroup.value.members.push(member)
-  selectMember(member)
+  currentGroup.value.members.push(newMember)
+  saveData()
+  selectMember(newMember)
   
   showAddMember.value = false
   selectedEditorType.value = null
   newMemberName.value = ''
 }
 
-async function togglePin(group: ChatGroup) {
-  await updateChatGroup(group.id, { isPinned: !group.isPinned })
-  group.isPinned = !group.isPinned
-  // 重新排序
-  groups.value.sort((a, b) => {
-    if (a.isPinned && !b.isPinned) return -1
-    if (!a.isPinned && b.isPinned) return 1
-    return (a.order || 0) - (b.order || 0)
-  })
-}
-
-function confirmDeleteGroup(group: ChatGroup) {
-  deleteTarget.value = { type: 'group', data: group }
-  showDeleteConfirm.value = true
-}
-
-function confirmDeleteRecord(record: ChatRecord) {
-  deleteTarget.value = { type: 'record', data: record }
-  showDeleteConfirm.value = true
-}
-
-async function executeDelete() {
-  if (!deleteTarget.value) return
-  
-  if (deleteTarget.value.type === 'group') {
-    await deleteChatGroup(deleteTarget.value.data.id)
-    groups.value = groups.value.filter(g => g.id !== deleteTarget.value.data.id)
-    if (currentGroup.value?.id === deleteTarget.value.data.id) {
-      currentGroup.value = null
-      currentMember.value = null
-      currentRecord.value = null
-    }
-  } else {
-    await deleteChatRecord(deleteTarget.value.data.id)
-    memberRecords.value = memberRecords.value.filter(r => r.id !== deleteTarget.value.data.id)
-    if (currentRecord.value?.id === deleteTarget.value.data.id) {
-      createNewRecord()
-    }
+function deleteGroup(id: string) {
+  groups.value = groups.value.filter(g => g.id !== id)
+  if (currentGroup.value?.id === id) {
+    currentGroup.value = null
+    currentMember.value = null
+    currentRecord.value = null
   }
-  
-  showDeleteConfirm.value = false
-  deleteTarget.value = null
+  saveData()
+}
+
+function deleteRecord(id: string) {
+  records.value = records.value.filter(r => r.id !== id)
+  if (currentRecord.value?.id === id) {
+    createNewRecord()
+  }
+  saveData()
 }
 
 function onContentChange() {
   saveStatus.value = 'idle'
   if (autoSaveTimer) clearTimeout(autoSaveTimer)
   autoSaveTimer = setTimeout(() => {
-    saveRecord()
-  }, 1500)
+    if (currentRecord.value) {
+      currentRecord.value.content = editorContent.value
+      currentRecord.value.updatedAt = new Date().toISOString()
+      saveData()
+    }
+  }, 1000)
 }
 
-async function saveRecord() {
-  if (!currentRecord.value) return
-  
-  saveStatus.value = 'saving'
-  
-  await updateChatRecord(currentRecord.value.id, {
-    content: editorContent.value,
-    title: currentRecord.value.title
-  })
-  
-  saveStatus.value = 'saved'
-  if (saveTimer) clearTimeout(saveTimer)
-  saveTimer = setTimeout(() => {
-    saveStatus.value = 'idle'
-  }, 2000)
+function selectBackground(bg: typeof backgroundOptions[0]) {
+  currentBg.value = bg.name
+  showBackgroundPicker.value = false
 }
 
 function formatDate(dateString: string): string {
@@ -504,44 +570,35 @@ function formatDate(dateString: string): string {
   return date.toLocaleDateString('zh-CN')
 }
 
-function getEditorDesc(type: EditorType): string {
-  const descs: Record<EditorType, string> = {
-    [EditorType.TEXT]: '首行缩进的文本编辑器，适合写日记、文章',
-    [EditorType.CODE]: '代码编辑器，支持语法高亮和行号',
-    [EditorType.MARKDOWN]: 'Markdown编辑器，支持预览',
-    [EditorType.ENGLISH]: '英语作文格式，带横线',
-    [EditorType.MATH]: '数学公式编辑器',
-    [EditorType.DRAWING]: '手写/画图板',
-    [EditorType.CUSTOM]: '自定义配置编辑器'
+function getEditorDesc(type: string): string {
+  const descs: Record<string, string> = {
+    text: '首行缩进的文本编辑器，适合写日记、文章',
+    code: '代码编辑器，支持语法高亮和行号',
+    markdown: 'Markdown编辑器，支持预览',
+    lined: '横线纸张，适合手写记录'
   }
-  return descs[type]
+  return descs[type] || '文本编辑器'
 }
 
-function getDefaultMemberName(type: EditorType): string {
-  const names: Record<EditorType, string> = {
-    [EditorType.TEXT]: '我的日记',
-    [EditorType.CODE]: '代码片段',
-    [EditorType.MARKDOWN]: 'Markdown笔记',
-    [EditorType.ENGLISH]: '英语作文',
-    [EditorType.MATH]: '数学笔记',
-    [EditorType.DRAWING]: '手绘板',
-    [EditorType.CUSTOM]: '自定义笔记'
+function getDefaultMemberName(type: string): string {
+  const names: Record<string, string> = {
+    text: '我的日记',
+    code: '代码片段',
+    markdown: 'Markdown笔记',
+    lined: '横线笔记'
   }
-  return names[type]
-}
-
-function insertMaterial(material: any) {
-  // 根据素材类型插入内容
-  if (material.type === 'text' || material.type === 'code') {
-    editorContent.value += '\n' + material.content + '\n'
-  } else if (material.type === 'link') {
-    editorContent.value += `\n[${material.title}](${material.content})\n`
-  }
-  onContentChange()
+  return names[type] || '笔记'
 }
 
 onMounted(() => {
-  loadGroups()
+  loadData()
+})
+
+// 监听记录变化，更新内容
+watch(() => currentRecord.value?.id, (newId) => {
+  if (newId && currentRecord.value) {
+    editorContent.value = currentRecord.value.content
+  }
 })
 </script>
 
@@ -621,18 +678,6 @@ onMounted(() => {
   background: var(--accent-primary-light);
 }
 
-.group-item.pinned::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 3px;
-  height: 20px;
-  background: var(--accent-primary);
-  border-radius: var(--radius-full);
-}
-
 .group-avatar {
   width: 40px;
   height: 40px;
@@ -668,18 +713,7 @@ onMounted(() => {
   text-overflow: ellipsis;
 }
 
-.group-actions {
-  display: flex;
-  gap: var(--space-1);
-  opacity: 0;
-  transition: var(--transition-normal);
-}
-
-.group-item:hover .group-actions {
-  opacity: 1;
-}
-
-.action-btn {
+.delete-btn {
   width: 28px;
   height: 28px;
   display: flex;
@@ -690,19 +724,15 @@ onMounted(() => {
   border-radius: var(--radius-sm);
   color: var(--text-muted);
   cursor: pointer;
+  opacity: 0;
   transition: var(--transition-normal);
 }
 
-.action-btn:hover {
-  background: var(--bg-secondary);
-  color: var(--text-primary);
+.group-item:hover .delete-btn {
+  opacity: 1;
 }
 
-.action-btn.pin.pinned {
-  color: var(--accent-primary);
-}
-
-.action-btn.delete:hover {
+.delete-btn:hover {
   color: var(--accent-danger);
 }
 
@@ -728,22 +758,6 @@ onMounted(() => {
 
 .create-btn:hover {
   background: var(--accent-primary-hover);
-}
-
-.material-library-entry {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-3) var(--space-4);
-  border-top: 1px solid var(--border);
-  color: var(--text-secondary);
-  cursor: pointer;
-  transition: var(--transition-normal);
-}
-
-.material-library-entry:hover {
-  background: var(--bg-hover);
-  color: var(--text-primary);
 }
 
 /* 中间成员列表 */
@@ -1041,10 +1055,43 @@ onMounted(() => {
   color: var(--accent-success);
 }
 
+.action-btn {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: var(--transition-normal);
+}
+
+.action-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
 .editor-container {
   flex: 1;
   overflow: auto;
   padding: var(--space-4);
+}
+
+.editor-textarea {
+  width: 100%;
+  height: 100%;
+  min-height: 400px;
+  background: transparent;
+  border: none;
+  outline: none;
+  resize: none;
+  font-family: inherit;
+  font-size: inherit;
+  line-height: inherit;
+  color: inherit;
 }
 
 .empty-editor {
@@ -1148,5 +1195,113 @@ onMounted(() => {
 .type-desc {
   font-size: var(--font-size-sm);
   color: var(--text-muted);
+}
+
+.btn-secondary,
+.btn-primary {
+  padding: var(--space-2) var(--space-4);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  border: none;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: var(--transition-normal);
+}
+
+.btn-secondary {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+}
+
+.btn-secondary:hover {
+  background: var(--bg-hover);
+}
+
+.btn-primary {
+  background: var(--accent-primary);
+  color: white;
+}
+
+.btn-primary:hover {
+  background: var(--accent-primary-hover);
+}
+
+.btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* 背景选择 */
+.background-options {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-3);
+}
+
+.bg-option {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 2px solid var(--border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: var(--transition-normal);
+}
+
+.bg-option:hover {
+  border-color: var(--accent-primary);
+}
+
+.bg-option.active {
+  border-color: var(--accent-primary);
+  background: var(--accent-primary-light);
+}
+
+.bg-preview {
+  width: 60px;
+  height: 60px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+}
+
+.bg-name {
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+}
+
+/* 响应式 */
+@media (max-width: 1024px) {
+  .sidebar {
+    width: 200px;
+  }
+  
+  .member-sidebar {
+    width: 220px;
+  }
+}
+
+@media (max-width: 768px) {
+  .wechat-note-view {
+    flex-direction: column;
+    height: auto;
+  }
+  
+  .sidebar,
+  .member-sidebar {
+    width: 100%;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+  }
+  
+  .editor-area {
+    min-height: 400px;
+  }
+  
+  .background-options {
+    grid-template-columns: repeat(2, 1fr);
+  }
 }
 </style>

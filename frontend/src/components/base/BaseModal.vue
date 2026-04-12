@@ -1,8 +1,8 @@
 <template>
   <Teleport to="body">
     <Transition name="modal">
-      <div v-if="modelValue" class="modal-overlay" @click.self="closeOnOverlay && close()">
-        <div class="modal-container" :class="{ 'modal-fullscreen': fullscreen }">
+      <div v-if="isOpen" class="modal-overlay" @click.self="closeOnOverlayClick">
+        <div class="modal-container" :class="[sizeClass, { 'modal-fullscreen': fullscreen }]">
           <div v-if="$slots.header || title" class="modal-header">
             <slot name="header">
               <h3 class="modal-title">{{ title }}</h3>
@@ -27,28 +27,38 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
+
 interface Props {
-  modelValue: boolean
+  isOpen: boolean
   title?: string
   showClose?: boolean
   closeOnOverlay?: boolean
   fullscreen?: boolean
+  size?: 'small' | 'medium' | 'large' | 'full'
 }
 
 const props = withDefaults(defineProps<Props>(), {
   showClose: true,
   closeOnOverlay: true,
-  fullscreen: false
+  fullscreen: false,
+  size: 'medium'
 })
 
 const emit = defineEmits<{
-  'update:modelValue': [value: boolean]
   close: []
 }>()
 
+const sizeClass = computed(() => `modal-${props.size}`)
+
 function close() {
-  emit('update:modelValue', false)
   emit('close')
+}
+
+function closeOnOverlayClick() {
+  if (props.closeOnOverlay) {
+    close()
+  }
 }
 </script>
 
@@ -68,12 +78,28 @@ function close() {
   background: var(--bg-primary);
   border-radius: var(--radius-xl);
   width: 100%;
-  max-width: 500px;
   max-height: 90vh;
   overflow: hidden;
   display: flex;
   flex-direction: column;
   box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+}
+
+/* 尺寸变体 */
+.modal-small {
+  max-width: 400px;
+}
+
+.modal-medium {
+  max-width: 500px;
+}
+
+.modal-large {
+  max-width: 800px;
+}
+
+.modal-full {
+  max-width: 95vw;
 }
 
 .modal-fullscreen {

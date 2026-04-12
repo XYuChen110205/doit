@@ -1,433 +1,763 @@
 <template>
   <div class="settings-view">
-    <div class="settings-container">
-      <!-- 标题 -->
-      <h1 class="settings-title">设置</h1>
-
-      <!-- 字体设置 -->
-      <div class="settings-section">
-        <FontSelector />
-      </div>
-
-      <!-- 角色选择 -->
-      <div class="settings-section">
-        <h2 class="section-title">角色模式</h2>
-        <p class="section-desc">选择适合你的工作/学习模式，系统将为你定制专属功能</p>
-        <div class="role-grid">
+    <div class="settings-layout">
+      <!-- 左侧设置菜单 -->
+      <aside class="settings-sidebar">
+        <h2 class="sidebar-title">设置</h2>
+        <nav class="settings-nav">
           <button
-            v-for="role in roles"
-            :key="role.id"
-            class="role-card"
-            :class="{ active: currentRole === role.id }"
-            @click="selectRole(role.id)"
+            v-for="section in sections"
+            :key="section.id"
+            class="nav-item"
+            :class="{ active: currentSection === section.id }"
+            @click="currentSection = section.id"
           >
-            <span class="role-icon">{{ role.icon }}</span>
-            <span class="role-name">{{ role.name }}</span>
-            <span class="role-desc">{{ role.desc }}</span>
+            <SvgIcon :name="section.icon" :size="18" />
+            <span>{{ section.name }}</span>
           </button>
-        </div>
-      </div>
+        </nav>
+      </aside>
 
-      <!-- 标签管理 -->
-      <div class="settings-section">
-        <h2 class="section-title">标签管理</h2>
-        <div class="tags-list">
-          <div v-for="tag in tags" :key="tag.id" class="tag-item">
-            <span class="tag-color" :style="{ backgroundColor: tag.color }"></span>
-            <span class="tag-name">{{ tag.name }}</span>
-            <button class="tag-delete" @click="removeTag(tag.id)">×</button>
+      <!-- 右侧设置内容 -->
+      <main class="settings-content">
+        <!-- 外观设置 -->
+        <section v-if="currentSection === 'appearance'" class="settings-section">
+          <h3 class="section-title">外观</h3>
+
+          <div class="setting-item">
+            <div class="setting-info">
+              <span class="setting-name">主题</span>
+              <span class="setting-desc">选择浅色或深色主题</span>
+            </div>
+            <ThemeSwitcher />
           </div>
-        </div>
-        <div class="add-tag">
-          <input
-            v-model="newTagName"
-            type="text"
-            class="tag-input"
-            placeholder="新标签名称"
-            @keyup.enter="addTag"
-          />
-          <button class="add-btn" @click="addTag">添加</button>
-        </div>
-      </div>
 
-      <!-- 数据导出 -->
-      <div class="settings-section">
-        <h2 class="section-title">数据导出</h2>
-        <p class="section-desc">将所有任务、笔记和收集箱数据导出为 JSON 文件</p>
-        <button class="export-btn" @click="exportData">导出 JSON</button>
-      </div>
+          <div class="setting-item">
+            <div class="setting-info">
+              <span class="setting-name">字体</span>
+              <span class="setting-desc">选择你喜欢的字体</span>
+            </div>
+            <FontSelector />
+          </div>
+        </section>
 
-      <!-- 关于 -->
-      <div class="settings-section">
-        <h2 class="section-title">关于</h2>
-        <div class="about-info">
-          <p class="about-item">
-            <span class="about-label">应用名称</span>
-            <span class="about-value">Todo System v1.0</span>
-          </p>
-          <p class="about-item">
-            <span class="about-label">数据存储</span>
-            <span class="about-value">本地 SQLite 数据库</span>
-          </p>
-        </div>
-      </div>
+        <!-- 工作模式设置 -->
+        <section v-if="currentSection === 'mode'" class="settings-section">
+          <h3 class="section-title">工作模式</h3>
+          <p class="section-desc">选择适合你的工作/学习模式，启用专属功能</p>
+
+          <div class="mode-list">
+            <label
+              v-for="mode in modes"
+              :key="mode.id"
+              class="mode-card"
+              :class="{ active: currentMode === mode.id }"
+            >
+              <input
+                type="radio"
+                name="workMode"
+                :value="mode.id"
+                :checked="currentMode === mode.id"
+                @change="selectMode(mode.id)"
+              />
+              <div class="mode-icon">
+                <SvgIcon :name="mode.icon" :size="24" />
+              </div>
+              <div class="mode-info">
+                <span class="mode-name">{{ mode.name }}</span>
+                <span class="mode-desc">{{ mode.desc }}</span>
+              </div>
+              <div v-if="currentMode === mode.id" class="mode-check">
+                <SvgIcon name="Check" :size="16" />
+              </div>
+            </label>
+          </div>
+
+          <div v-if="currentMode !== 'standard'" class="mode-preview">
+            <h4>当前模式功能</h4>
+            <ul class="feature-list">
+              <li v-for="feature in currentModeFeatures" :key="feature">
+                <SvgIcon name="Check" :size="14" />
+                {{ feature }}
+              </li>
+            </ul>
+          </div>
+        </section>
+
+        <!-- 数据管理 -->
+        <section v-if="currentSection === 'data'" class="settings-section">
+          <h3 class="section-title">数据管理</h3>
+
+          <div class="setting-item">
+            <div class="setting-info">
+              <span class="setting-name">导出数据</span>
+              <span class="setting-desc">将所有数据导出为 JSON 文件备份</span>
+            </div>
+            <button class="btn-secondary" @click="exportData">
+              <SvgIcon name="Download" :size="16" />
+              导出
+            </button>
+          </div>
+
+          <div class="setting-item">
+            <div class="setting-info">
+              <span class="setting-name">导入数据</span>
+              <span class="setting-desc">从 JSON 文件恢复数据</span>
+            </div>
+            <button class="btn-secondary" @click="showImportDialog = true">
+              <SvgIcon name="Upload" :size="16" />
+              导入
+            </button>
+          </div>
+
+          <div class="setting-item danger">
+            <div class="setting-info">
+              <span class="setting-name">清除所有数据</span>
+              <span class="setting-desc">删除所有本地数据，此操作不可恢复</span>
+            </div>
+            <button class="btn-danger" @click="showClearConfirm = true">
+              <SvgIcon name="Trash" :size="16" />
+              清除
+            </button>
+          </div>
+        </section>
+
+        <!-- 关于 -->
+        <section v-if="currentSection === 'about'" class="settings-section">
+          <h3 class="section-title">关于</h3>
+
+          <div class="about-card">
+            <div class="app-logo">
+              <SvgIcon name="Sparkle" :size="48" />
+            </div>
+            <h4 class="app-name">Do It</h4>
+            <p class="app-version">版本 1.0.0</p>
+            <p class="app-desc">简洁高效的任务管理系统</p>
+          </div>
+
+          <div class="info-list">
+            <div class="info-item">
+              <span class="info-label">数据存储</span>
+              <span class="info-value">本地浏览器存储</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">技术栈</span>
+              <span class="info-value">Vue 3 + TypeScript</span>
+            </div>
+          </div>
+        </section>
+      </main>
     </div>
+
+    <!-- 导入对话框 -->
+    <BaseModal v-if="showImportDialog" @close="showImportDialog = false">
+      <template #title>导入数据</template>
+      <template #default>
+        <div class="import-dialog">
+          <p class="dialog-desc">选择之前导出的 JSON 文件进行恢复</p>
+          <input
+            type="file"
+            accept=".json"
+            @change="handleFileSelect"
+            class="file-input"
+          />
+          <p v-if="importError" class="error-text">{{ importError }}</p>
+        </div>
+      </template>
+      <template #footer>
+        <button class="btn-secondary" @click="showImportDialog = false">取消</button>
+        <button class="btn-primary" @click="confirmImport" :disabled="!selectedFile">导入</button>
+      </template>
+    </BaseModal>
+
+    <!-- 清除确认对话框 -->
+    <BaseModal v-if="showClearConfirm" @close="showClearConfirm = false">
+      <template #title>确认清除</template>
+      <template #default>
+        <div class="confirm-dialog">
+          <p class="warning-text">确定要清除所有数据吗？此操作不可恢复。</p>
+          <label class="confirm-checkbox">
+            <input type="checkbox" v-model="confirmClear" />
+            我确认要删除所有数据
+          </label>
+        </div>
+      </template>
+      <template #footer>
+        <button class="btn-secondary" @click="showClearConfirm = false">取消</button>
+        <button class="btn-danger" @click="clearAllData" :disabled="!confirmClear">确认清除</button>
+      </template>
+    </BaseModal>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import type { Tag } from '../types'
-import { listTags, createTag, deleteTag } from '../api/tags'
-import { exportData as exportDataApi } from '../api/settings'
+import { ref, computed } from 'vue'
+import { useRouter } from 'vue-router'
+import SvgIcon from '../components/icons/SvgIcon.vue'
+import ThemeSwitcher from '../components/ThemeSwitcher.vue'
 import FontSelector from '../components/FontSelector.vue'
+import BaseModal from '../components/base/BaseModal.vue'
 
-// 角色列表
-const roles = [
-  { id: 'default', name: '默认模式', icon: '📋', desc: '通用任务管理' },
-  { id: 'makeup', name: '化妆师', icon: '💄', desc: '预约排班管理' },
-  { id: 'student', name: '学生', icon: '📚', desc: '课程作业管理' },
-  { id: 'study', name: '自习', icon: '🧘', desc: '专注学习计时' },
-  { id: 'manager', name: '店长', icon: '🏪', desc: '店铺运营管理' },
-  { id: 'cs_student', name: '计算机学生', icon: '💻', desc: '项目学习管理' },
-  { id: 'custom', name: '个人专属', icon: '⭐', desc: '完全自定义' }
+const router = useRouter()
+
+// 当前设置区块
+const currentSection = ref('appearance')
+
+// 设置菜单
+const sections = [
+  { id: 'appearance', name: '外观', icon: 'Palette' },
+  { id: 'mode', name: '工作模式', icon: 'Layout' },
+  { id: 'data', name: '数据管理', icon: 'Database' },
+  { id: 'about', name: '关于', icon: 'Info' }
 ]
 
-// 当前角色
-const currentRole = ref('default')
+// 工作模式
+const modes = [
+  {
+    id: 'standard',
+    name: '标准模式',
+    icon: 'Home',
+    desc: '通用任务管理，适合日常使用',
+    features: ['今日待办', '收集箱', '日历视图', '笔记系统', '数据统计']
+  },
+  {
+    id: 'student',
+    name: '学生模式',
+    icon: 'Student',
+    desc: '课程作业管理，学生专属功能',
+    features: ['作业管理', '课程表', '考试倒计时', '成绩追踪', '自习统计']
+  },
+  {
+    id: 'focus',
+    name: '专注模式',
+    icon: 'Clock',
+    desc: '番茄钟计时，提升专注力',
+    features: ['番茄钟', '专注统计', '白噪音', '专注挑战']
+  }
+]
 
-// 标签列表
-const tags = ref<Tag[]>([])
-const newTagName = ref('')
+// 当前模式
+const currentMode = ref(localStorage.getItem('workMode') || 'standard')
 
-// 选择角色
-function selectRole(roleId: string) {
-  currentRole.value = roleId
-  localStorage.setItem('userRole', roleId)
-  // 刷新页面以应用新角色
+// 当前模式功能
+const currentModeFeatures = computed(() => {
+  const mode = modes.find(m => m.id === currentMode.value)
+  return mode?.features || []
+})
+
+// 对话框状态
+const showImportDialog = ref(false)
+const showClearConfirm = ref(false)
+const selectedFile = ref<File | null>(null)
+const importError = ref('')
+const confirmClear = ref(false)
+
+// 选择工作模式
+function selectMode(modeId: string) {
+  currentMode.value = modeId
+  localStorage.setItem('workMode', modeId)
+  // 刷新页面以应用新模式
   window.location.reload()
-}
-
-// 加载角色
-function loadRole() {
-  const savedRole = localStorage.getItem('userRole')
-  if (savedRole) {
-    currentRole.value = savedRole
-  }
-}
-
-// 加载标签
-async function loadTags() {
-  try {
-    tags.value = await listTags()
-  } catch (error) {
-    console.error('加载标签失败:', error)
-  }
-}
-
-// 添加标签
-async function addTag() {
-  const name = newTagName.value.trim()
-  if (!name) return
-
-  try {
-    await createTag(name)
-    newTagName.value = ''
-    await loadTags()
-  } catch (error) {
-    console.error('创建标签失败:', error)
-  }
-}
-
-// 删除标签
-async function removeTag(id: number) {
-  try {
-    await deleteTag(id)
-    await loadTags()
-  } catch (error) {
-    console.error('删除标签失败:', error)
-  }
 }
 
 // 导出数据
 function exportData() {
-  exportDataApi()
+  const data = {
+    tasks: JSON.parse(localStorage.getItem('tasks') || '[]'),
+    notes: JSON.parse(localStorage.getItem('notes') || '[]'),
+    chatGroups: JSON.parse(localStorage.getItem('chatGroups') || '[]'),
+    inboxItems: JSON.parse(localStorage.getItem('inboxItems') || '[]'),
+    exportDate: new Date().toISOString()
+  }
+
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `doit-backup-${new Date().toISOString().split('T')[0]}.json`
+  a.click()
+  URL.revokeObjectURL(url)
 }
 
-// 初始化
-onMounted(() => {
-  loadRole()
-  loadTags()
-})
+// 选择文件
+function handleFileSelect(event: Event) {
+  const input = event.target as HTMLInputElement
+  if (input.files && input.files[0]) {
+    selectedFile.value = input.files[0]
+    importError.value = ''
+  }
+}
+
+// 确认导入
+async function confirmImport() {
+  if (!selectedFile.value) return
+
+  try {
+    const text = await selectedFile.value.text()
+    const data = JSON.parse(text)
+
+    // 验证数据格式
+    if (data.tasks) localStorage.setItem('tasks', JSON.stringify(data.tasks))
+    if (data.notes) localStorage.setItem('notes', JSON.stringify(data.notes))
+    if (data.chatGroups) localStorage.setItem('chatGroups', JSON.stringify(data.chatGroups))
+    if (data.inboxItems) localStorage.setItem('inboxItems', JSON.stringify(data.inboxItems))
+
+    showImportDialog.value = false
+    selectedFile.value = null
+    alert('数据导入成功')
+    window.location.reload()
+  } catch (error) {
+    importError.value = '文件格式错误，请检查文件内容'
+  }
+}
+
+// 清除所有数据
+function clearAllData() {
+  localStorage.clear()
+  showClearConfirm.value = false
+  confirmClear.value = false
+  alert('所有数据已清除')
+  router.push('/login')
+}
 </script>
 
 <style scoped>
 .settings-view {
-  min-height: calc(100vh - 64px - var(--space-8) * 2);
-  padding: var(--space-8);
+  min-height: calc(100vh - 64px - var(--space-6) * 2);
 }
 
-.settings-container {
-  max-width: 680px;
-  margin: 0 auto;
+.settings-layout {
   display: flex;
-  flex-direction: column;
   gap: var(--space-6);
+  max-width: 1200px;
+  margin: 0 auto;
 }
 
-/* 标题 */
-.settings-title {
-  font-size: var(--font-size-2xl);
+/* 左侧侧边栏 */
+.settings-sidebar {
+  width: 240px;
+  flex-shrink: 0;
+  background: var(--bg-card);
+  border-radius: var(--radius-lg);
+  padding: var(--space-5);
+  box-shadow: var(--shadow-card);
+  height: fit-content;
+  position: sticky;
+  top: var(--space-6);
+}
+
+.sidebar-title {
+  font-size: var(--font-size-xl);
   font-weight: var(--font-weight-bold);
   color: var(--text-primary);
-  letter-spacing: var(--letter-spacing-wide);
-  text-align: center;
+  margin-bottom: var(--space-5);
+  padding-bottom: var(--space-4);
+  border-bottom: 1px solid var(--border-light);
 }
 
-/* 设置区块 */
+.settings-nav {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-md);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: var(--transition-normal);
+  text-align: left;
+}
+
+.nav-item:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.nav-item.active {
+  background: var(--accent-primary-light);
+  color: var(--accent-primary);
+}
+
+/* 右侧内容区 */
+.settings-content {
+  flex: 1;
+  min-width: 0;
+}
+
 .settings-section {
-  background-color: var(--bg-card);
+  background: var(--bg-card);
   border-radius: var(--radius-lg);
   padding: var(--space-6);
   box-shadow: var(--shadow-card);
+  margin-bottom: var(--space-6);
 }
 
 .section-title {
-  font-size: var(--font-size-lg);
+  font-size: var(--font-size-xl);
   font-weight: var(--font-weight-bold);
   color: var(--text-primary);
-  margin-bottom: var(--space-4);
-  letter-spacing: var(--letter-spacing-wide);
+  margin-bottom: var(--space-2);
 }
 
 .section-desc {
   font-size: var(--font-size-sm);
   color: var(--text-secondary);
-  margin-bottom: var(--space-4);
-  letter-spacing: var(--letter-spacing-wide);
+  margin-bottom: var(--space-6);
 }
 
-/* 角色网格 */
-.role-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: var(--space-3);
+/* 设置项 */
+.setting-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-5) 0;
+  border-bottom: 1px solid var(--border-light);
 }
 
-.role-card {
+.setting-item:last-child {
+  border-bottom: none;
+}
+
+.setting-item.danger {
+  border-top: 1px solid var(--border-light);
+  margin-top: var(--space-4);
+  padding-top: var(--space-5);
+}
+
+.setting-info {
   display: flex;
   flex-direction: column;
+  gap: var(--space-1);
+}
+
+.setting-name {
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-primary);
+}
+
+.setting-desc {
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+}
+
+/* 按钮 */
+.btn-primary,
+.btn-secondary,
+.btn-danger {
+  display: flex;
   align-items: center;
   gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  border: none;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: var(--transition-normal);
+}
+
+.btn-primary {
+  background: var(--accent-primary);
+  color: var(--text-inverse);
+}
+
+.btn-primary:hover {
+  background: var(--accent-primary-hover);
+}
+
+.btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-secondary {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+}
+
+.btn-secondary:hover {
+  background: var(--bg-hover);
+}
+
+.btn-danger {
+  background: rgba(229, 115, 115, 0.1);
+  color: var(--accent-danger);
+  border: 1px solid var(--accent-danger);
+}
+
+.btn-danger:hover {
+  background: var(--accent-danger);
+  color: white;
+}
+
+.btn-danger:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* 工作模式 */
+.mode-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin-bottom: var(--space-6);
+}
+
+.mode-card {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
   padding: var(--space-4);
-  background-color: var(--bg-primary);
-  border: 2px solid transparent;
+  background: var(--bg-primary);
+  border: 2px solid var(--border);
   border-radius: var(--radius-lg);
   cursor: pointer;
   transition: var(--transition-normal);
 }
 
-.role-card:hover {
+.mode-card:hover {
   border-color: var(--accent-primary);
-  transform: translateY(-2px);
 }
 
-.role-card.active {
+.mode-card.active {
   border-color: var(--accent-primary);
-  background-color: var(--accent-primary-light);
+  background: var(--accent-primary-light);
 }
 
-.role-icon {
-  font-size: 24px;
+.mode-card input[type="radio"] {
+  display: none;
 }
 
-.role-name {
-  font-size: var(--font-size-md);
-  font-weight: var(--font-weight-medium);
-  color: var(--text-primary);
-}
-
-.role-desc {
-  font-size: var(--font-size-xs);
-  color: var(--text-secondary);
-  text-align: center;
-}
-
-/* 标签列表 */
-.tags-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-  margin-bottom: var(--space-4);
-}
-
-.tag-item {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-2) var(--space-3);
-  background-color: var(--bg-primary);
-  border-radius: var(--radius-md);
-}
-
-.tag-color {
-  width: 12px;
-  height: 12px;
-  border-radius: var(--radius-full);
-}
-
-.tag-name {
-  font-size: var(--font-size-sm);
-  color: var(--text-primary);
-}
-
-.tag-delete {
-  width: 20px;
-  height: 20px;
+.mode-icon {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: var(--font-size-md);
-  color: var(--text-muted);
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  border-radius: var(--radius-sm);
-  transition: var(--transition-normal);
-}
-
-.tag-delete:hover {
-  color: var(--accent-danger);
-  background-color: rgba(204, 139, 139, 0.1);
-}
-
-/* 添加标签 */
-.add-tag {
-  display: flex;
-  gap: var(--space-2);
-}
-
-.tag-input {
-  flex: 1;
-  padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  font-family: var(--font-family-base);
-  font-size: var(--font-size-sm);
-  color: var(--text-primary);
-  background-color: var(--bg-primary);
-  transition: var(--transition-normal);
-  outline: none;
-}
-
-.tag-input::placeholder {
-  color: var(--text-muted);
-}
-
-.tag-input:focus {
-  border-color: var(--accent-primary);
-  box-shadow: 0 0 0 3px var(--accent-primary-light);
-}
-
-.add-btn {
-  padding: var(--space-2) var(--space-4);
-  font-family: var(--font-family-base);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-medium);
-  color: var(--text-inverse);
-  background-color: var(--accent-primary);
-  border: none;
-  border-radius: var(--radius-md);
-  cursor: pointer;
-  transition: var(--transition-normal);
-  letter-spacing: var(--letter-spacing-wide);
-}
-
-.add-btn:hover {
-  background-color: var(--accent-primary-hover);
-}
-
-/* 导出按钮 */
-.export-btn {
-  padding: var(--space-3) var(--space-5);
-  font-family: var(--font-family-base);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-medium);
+  width: 48px;
+  height: 48px;
+  background: var(--bg-card);
+  border-radius: var(--radius-lg);
   color: var(--accent-primary);
-  background-color: var(--accent-primary-light);
-  border: none;
-  border-radius: var(--radius-md);
-  cursor: pointer;
-  transition: var(--transition-normal);
-  letter-spacing: var(--letter-spacing-wide);
 }
 
-.export-btn:hover {
-  background-color: var(--accent-primary);
-  color: var(--text-inverse);
-}
-
-/* 关于信息 */
-.about-info {
+.mode-info {
+  flex: 1;
   display: flex;
   flex-direction: column;
+  gap: var(--space-1);
+}
+
+.mode-name {
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-primary);
+}
+
+.mode-desc {
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+}
+
+.mode-check {
+  color: var(--accent-primary);
+}
+
+/* 模式预览 */
+.mode-preview {
+  background: var(--bg-primary);
+  border-radius: var(--radius-lg);
+  padding: var(--space-5);
+}
+
+.mode-preview h4 {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-secondary);
+  margin-bottom: var(--space-3);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.feature-list {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
   gap: var(--space-3);
 }
 
-.about-item {
+.feature-list li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--font-size-sm);
+  color: var(--text-primary);
+}
+
+.feature-list li svg {
+  color: var(--accent-success);
+}
+
+/* 关于卡片 */
+.about-card {
+  text-align: center;
+  padding: var(--space-8) var(--space-6);
+  background: var(--bg-primary);
+  border-radius: var(--radius-lg);
+  margin-bottom: var(--space-6);
+}
+
+.app-logo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 80px;
+  height: 80px;
+  background: var(--accent-primary-light);
+  border-radius: var(--radius-xl);
+  color: var(--accent-primary);
+  margin-bottom: var(--space-4);
+}
+
+.app-name {
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-bold);
+  color: var(--text-primary);
+  margin-bottom: var(--space-1);
+}
+
+.app-version {
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+  margin-bottom: var(--space-2);
+}
+
+.app-desc {
+  font-size: var(--font-size-md);
+  color: var(--text-secondary);
+}
+
+/* 信息列表 */
+.info-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.info-item {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: var(--space-3) 0;
+  padding: var(--space-4) 0;
   border-bottom: 1px solid var(--border-light);
 }
 
-.about-item:last-child {
+.info-item:last-child {
   border-bottom: none;
 }
 
-.about-label {
+.info-label {
   font-size: var(--font-size-sm);
   color: var(--text-secondary);
-  letter-spacing: var(--letter-spacing-wide);
 }
 
-.about-value {
+.info-value {
   font-size: var(--font-size-sm);
   color: var(--text-primary);
   font-weight: var(--font-weight-medium);
+}
+
+/* 对话框 */
+.import-dialog,
+.confirm-dialog {
+  padding: var(--space-4) 0;
+}
+
+.dialog-desc {
+  font-size: var(--font-size-md);
+  color: var(--text-secondary);
+  margin-bottom: var(--space-4);
+}
+
+.file-input {
+  width: 100%;
+  padding: var(--space-3);
+  border: 2px dashed var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-primary);
+  cursor: pointer;
+}
+
+.error-text {
+  color: var(--accent-danger);
+  font-size: var(--font-size-sm);
+  margin-top: var(--space-2);
+}
+
+.warning-text {
+  color: var(--accent-danger);
+  font-size: var(--font-size-md);
+  margin-bottom: var(--space-4);
+}
+
+.confirm-checkbox {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.confirm-checkbox input {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
 }
 
 /* 响应式适配 */
 @media (max-width: 768px) {
-  .settings-view {
-    padding: var(--space-5);
-  }
-
-  .settings-container {
-    max-width: 100%;
-  }
-
-  .role-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
-@media (max-width: 480px) {
-  .settings-view {
-    padding: var(--space-4);
-  }
-
-  .settings-title {
-    font-size: var(--font-size-xl);
-  }
-
-  .add-tag {
+  .settings-layout {
     flex-direction: column;
   }
 
-  .add-btn {
+  .settings-sidebar {
     width: 100%;
+    position: static;
+  }
+
+  .settings-nav {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+
+  .nav-item {
+    flex: 1;
+    min-width: 100px;
+    justify-content: center;
+  }
+
+  .feature-list {
+    grid-template-columns: 1fr;
+  }
+
+  .setting-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-3);
+  }
+
+  .setting-item > button {
+    width: 100%;
+    justify-content: center;
   }
 }
 </style>
