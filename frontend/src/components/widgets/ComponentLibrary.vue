@@ -108,7 +108,7 @@ const categories = [
 
 // 组件分类映射
 const widgetCategories: Record<string, WidgetType[]> = {
-  editor: [WidgetType.LINED_PAPER, WidgetType.NOTE_EDITOR, WidgetType.CODE_EDITOR, WidgetType.MARKDOWN],
+  editor: [WidgetType.LINED_PAPER, WidgetType.NOTE_EDITOR, WidgetType.CODE_EDITOR, WidgetType.MARKDOWN, WidgetType.BEAUTIFUL_EDITOR],
   productivity: [WidgetType.POMODORO, WidgetType.TASK_LIST, WidgetType.COUNTDOWN],
   organize: [WidgetType.SCHEDULE, WidgetType.LINKS, WidgetType.STATS]
 }

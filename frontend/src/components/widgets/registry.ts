@@ -134,6 +134,19 @@ export const widgetRegistry: WidgetConfig[] = [
     },
     allowBackgroundCustomize: true,
     allowMultiple: true
+  },
+  {
+    id: 'beautiful_editor',
+    type: WidgetType.BEAUTIFUL_EDITOR,
+    title: '唯美文章',
+    icon: 'Book',
+    description: '课本风格背景的文章编辑器',
+    defaultBackground: {
+      type: BackgroundType.IMAGE,
+      imageUrl: '/backgrounds/bg2.jpg'
+    },
+    allowBackgroundCustomize: false,
+    allowMultiple: true
   }
 ]
 

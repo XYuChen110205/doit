@@ -180,6 +180,15 @@
                 @update="(data) => updateWidgetData(widget.instanceId, data)"
                 @open-detail="openWidgetDetail(widget.instanceId)"
               />
+              <!-- 唯美文章预览 -->
+              <BeautifulEditor
+                v-else-if="widget.widgetType === WidgetType.BEAUTIFUL_EDITOR"
+                :instance-id="widget.instanceId"
+                :initial-data="widget.data"
+                :is-detail-view="false"
+                @update="(data) => updateWidgetData(widget.instanceId, data)"
+                @open-detail="openWidgetDetail(widget.instanceId)"
+              />
               <!-- 其他组件 -->
               <div v-else class="preview-placeholder">
                 <SvgIcon :name="getWidgetIcon(widget.widgetType)" :size="32" />
@@ -271,6 +280,15 @@
                   @update="(data) => updateWidgetData(widget.instanceId, data)"
                   @close-detail="closeWidgetDetail"
                 />
+                <!-- 唯美文章详情 -->
+                <BeautifulEditor
+                  v-else-if="widget.widgetType === WidgetType.BEAUTIFUL_EDITOR"
+                  :instance-id="widget.instanceId"
+                  :initial-data="widget.data"
+                  :is-detail-view="true"
+                  @update="(data) => updateWidgetData(widget.instanceId, data)"
+                  @close-detail="closeWidgetDetail"
+                />
                 <!-- 其他组件 -->
                 <div v-else class="detail-placeholder">
                   <SvgIcon :name="getWidgetIcon(widget.widgetType)" :size="48" />
@@ -311,6 +329,7 @@ import PomodoroWidget from '../components/widgets/PomodoroWidget.vue'
 import CountdownWidget from '../components/widgets/CountdownWidget.vue'
 import NoteEditor from '../components/widgets/NoteEditor.vue'
 import LinkCollector from '../components/widgets/LinkCollector.vue'
+import BeautifulEditor from '../components/widgets/BeautifulEditor.vue'
 import { WidgetType, type WidgetInstance } from '../types/widget'
 import { getWidgetConfig } from '../components/widgets/registry'
 

@@ -13,7 +13,8 @@ export enum WidgetType {
   LINKS = 'links',               // 链接收藏
   IMAGE_GALLERY = 'image_gallery', // 图片库
   MARKDOWN = 'markdown',         // Markdown编辑器
-  LINED_PAPER = 'lined_paper'    // 横线纸张编辑器
+  LINED_PAPER = 'lined_paper',   // 横线纸张编辑器
+  BEAUTIFUL_EDITOR = 'beautiful_editor' // 唯美文章编辑器
 }
 
 // 背景类型
