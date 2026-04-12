@@ -189,6 +189,24 @@
                 @update="(data) => updateWidgetData(widget.instanceId, data)"
                 @open-detail="openWidgetDetail(widget.instanceId)"
               />
+              <!-- 代码编辑器预览 -->
+              <CodeEditor
+                v-else-if="widget.widgetType === WidgetType.CODE_EDITOR"
+                :instance-id="widget.instanceId"
+                :initial-data="widget.data"
+                :is-detail-view="false"
+                @update="(data) => updateWidgetData(widget.instanceId, data)"
+                @open-detail="openWidgetDetail(widget.instanceId)"
+              />
+              <!-- 日历预览 -->
+              <CalendarWidget
+                v-else-if="widget.widgetType === WidgetType.CALENDAR"
+                :instance-id="widget.instanceId"
+                :initial-data="widget.data"
+                :is-detail-view="false"
+                @update="(data) => updateWidgetData(widget.instanceId, data)"
+                @open-detail="openWidgetDetail(widget.instanceId)"
+              />
               <!-- 其他组件 -->
               <div v-else class="preview-placeholder">
                 <SvgIcon :name="getWidgetIcon(widget.widgetType)" :size="32" />
@@ -289,6 +307,24 @@
                   @update="(data) => updateWidgetData(widget.instanceId, data)"
                   @close-detail="closeWidgetDetail"
                 />
+                <!-- 代码编辑器详情 -->
+                <CodeEditor
+                  v-else-if="widget.widgetType === WidgetType.CODE_EDITOR"
+                  :instance-id="widget.instanceId"
+                  :initial-data="widget.data"
+                  :is-detail-view="true"
+                  @update="(data) => updateWidgetData(widget.instanceId, data)"
+                  @close-detail="closeWidgetDetail"
+                />
+                <!-- 日历详情 -->
+                <CalendarWidget
+                  v-else-if="widget.widgetType === WidgetType.CALENDAR"
+                  :instance-id="widget.instanceId"
+                  :initial-data="widget.data"
+                  :is-detail-view="true"
+                  @update="(data) => updateWidgetData(widget.instanceId, data)"
+                  @close-detail="closeWidgetDetail"
+                />
                 <!-- 其他组件 -->
                 <div v-else class="detail-placeholder">
                   <SvgIcon :name="getWidgetIcon(widget.widgetType)" :size="48" />
@@ -330,6 +366,8 @@ import CountdownWidget from '../components/widgets/CountdownWidget.vue'
 import NoteEditor from '../components/widgets/NoteEditor.vue'
 import LinkCollector from '../components/widgets/LinkCollector.vue'
 import BeautifulEditor from '../components/widgets/BeautifulEditor.vue'
+import CodeEditor from '../components/widgets/CodeEditor.vue'
+import CalendarWidget from '../components/widgets/CalendarWidget.vue'
 import { WidgetType, type WidgetInstance } from '../types/widget'
 import { getWidgetConfig } from '../components/widgets/registry'
 
