@@ -37,9 +37,6 @@
           <button class="tool-btn" @click="copyContent" title="复制全文">
             <SvgIcon name="Copy" :size="16" />
           </button>
-          <button class="tool-btn" @click="exportImage" title="导出图片">
-            <SvgIcon name="Download" :size="16" />
-          </button>
         </div>
       </div>
 
@@ -66,24 +63,26 @@
       </div>
 
       <!-- 编辑器主体 -->
-      <div 
-        ref="editorContainerRef"
-        class="editor-container"
-        :style="editorBgStyle"
-      >
-        <div class="editor-paper">
-          <div class="paper-title">{{ title || '无标题' }}</div>
-          <div 
-            ref="editorRef"
-            class="editor-content"
-            contenteditable="true"
-            @input="onInput"
-            @keydown="onKeyDown"
-            v-html="content"
-          ></div>
-          <div class="paper-footer">
-            <span class="author">{{ author || '匿名' }}</span>
-            <span class="date">{{ formatDate(updatedAt) }}</span>
+      <div class="editor-wrapper">
+        <div 
+          ref="editorContainerRef"
+          class="editor-container"
+          :style="editorBgStyle"
+        >
+          <div class="editor-paper">
+            <div class="paper-title">{{ title || '无标题' }}</div>
+            <div 
+              ref="editorRef"
+              class="editor-content"
+              contenteditable="true"
+              @input="onInput"
+              @keydown="onKeyDown"
+              v-html="content"
+            ></div>
+            <div class="paper-footer">
+              <span class="author">{{ author || '匿名' }}</span>
+              <span class="date">{{ formatDate(updatedAt) }}</span>
+            </div>
           </div>
         </div>
       </div>
@@ -129,14 +128,14 @@ const emit = defineEmits<{
   closeDetail: []
 }>()
 
-// 背景选项
+// 背景选项 - 使用相对路径
 const backgroundOptions: BackgroundOption[] = [
-  { id: 'bg1', name: '田园风光', url: '/backgrounds/bg1.jpg', thumb: '/backgrounds/bg1.jpg', textColor: '#333', titleColor: '#2c3e50' },
-  { id: 'bg2', name: '春日嬉戏', url: '/backgrounds/bg2.jpg', thumb: '/backgrounds/bg2.jpg', textColor: '#333', titleColor: '#2c3e50' },
-  { id: 'bg3', name: '荷塘月色', url: '/backgrounds/bg3.jpg', thumb: '/backgrounds/bg3.jpg', textColor: '#333', titleColor: '#2c3e50' },
-  { id: 'bg4', name: '桂花飘香', url: '/backgrounds/bg4.jpg', thumb: '/backgrounds/bg4.jpg', textColor: '#333', titleColor: '#2c3e50' },
-  { id: 'bg5', name: '松鼠纸船', url: '/backgrounds/bg5.jpg', thumb: '/backgrounds/bg5.jpg', textColor: '#333', titleColor: '#2c3e50' },
-  { id: 'bg6', name: '图书馆', url: '/backgrounds/bg6.jpg', thumb: '/backgrounds/bg6.jpg', textColor: '#333', titleColor: '#2c3e50' },
+  { id: 'bg1', name: '田园风光', url: './backgrounds/bg1.jpg', thumb: './backgrounds/bg1.jpg', textColor: '#333', titleColor: '#2c3e50' },
+  { id: 'bg2', name: '春日嬉戏', url: './backgrounds/bg2.jpg', thumb: './backgrounds/bg2.jpg', textColor: '#333', titleColor: '#2c3e50' },
+  { id: 'bg3', name: '荷塘月色', url: './backgrounds/bg3.jpg', thumb: './backgrounds/bg3.jpg', textColor: '#333', titleColor: '#2c3e50' },
+  { id: 'bg4', name: '桂花飘香', url: './backgrounds/bg4.jpg', thumb: './backgrounds/bg4.jpg', textColor: '#333', titleColor: '#2c3e50' },
+  { id: 'bg5', name: '松鼠纸船', url: './backgrounds/bg5.jpg', thumb: './backgrounds/bg5.jpg', textColor: '#333', titleColor: '#2c3e50' },
+  { id: 'bg6', name: '图书馆', url: './backgrounds/bg6.jpg', thumb: './backgrounds/bg6.jpg', textColor: '#333', titleColor: '#2c3e50' },
 ]
 
 // 状态
@@ -157,7 +156,7 @@ const currentBg = computed(() => {
 })
 
 const previewBgStyle = computed(() => ({
-  backgroundImage: `url(${currentBg.value.url})`,
+  backgroundImage: `url(${currentBg.value.thumb})`,
   backgroundSize: 'cover',
   backgroundPosition: 'center'
 }))
@@ -165,14 +164,16 @@ const previewBgStyle = computed(() => ({
 const editorBgStyle = computed(() => ({
   backgroundImage: `url(${currentBg.value.url})`,
   backgroundSize: 'cover',
-  backgroundPosition: 'center',
-  backgroundAttachment: 'fixed'
+  backgroundPosition: 'center bottom',
+  backgroundRepeat: 'no-repeat'
 }))
 
 const previewText = computed(() => {
   const temp = document.createElement('div')
   temp.innerHTML = content.value
   let text = temp.textContent || temp.innerText || ''
+  // 移除拼音
+  text = text.replace(/[a-z]+'/gi, '').replace(/[a-z]+/gi, '')
   if (text.length > 60) {
     text = text.slice(0, 60) + '...'
   }
@@ -182,7 +183,9 @@ const previewText = computed(() => {
 const wordCount = computed(() => {
   const temp = document.createElement('div')
   temp.innerHTML = content.value
-  const text = temp.textContent || temp.innerText || ''
+  let text = temp.textContent || temp.innerText || ''
+  // 移除拼音
+  text = text.replace(/[a-z]+'/gi, '').replace(/[a-z]+/gi, '')
   return text.length
 })
 
@@ -244,17 +247,14 @@ function closeDetail() {
 function copyContent() {
   const temp = document.createElement('div')
   temp.innerHTML = content.value
-  const text = temp.textContent || temp.innerText || ''
+  let text = temp.textContent || temp.innerText || ''
+  // 移除拼音
+  text = text.replace(/[a-z]+'/gi, '').replace(/[a-z]+/gi, '')
   const fullText = `${title.value}\n\n${text}\n\n—— ${author.value || '匿名'} ${formatDate(updatedAt.value)}`
   navigator.clipboard.writeText(fullText).then(() => {
     saveStatus.value = '已复制'
     setTimeout(() => saveStatus.value = '已保存', 1500)
   })
-}
-
-function exportImage() {
-  saveStatus.value = '导出功能开发中...'
-  setTimeout(() => saveStatus.value = '已保存', 2000)
 }
 
 function formatTime(isoString: string): string {
@@ -320,9 +320,9 @@ onMounted(() => {
   inset: 0;
   background: linear-gradient(
     to bottom,
-    rgba(255, 255, 255, 0.7) 0%,
-    rgba(255, 255, 255, 0.5) 50%,
-    rgba(255, 255, 255, 0.8) 100%
+    rgba(255, 255, 255, 0.6) 0%,
+    rgba(255, 255, 255, 0.3) 50%,
+    rgba(255, 255, 255, 0.7) 100%
   );
 }
 
@@ -350,7 +350,7 @@ onMounted(() => {
   flex: 1;
   font-size: 13px;
   line-height: 1.6;
-  color: #555;
+  color: #444;
   margin: 0;
   overflow: hidden;
   display: -webkit-box;
@@ -367,8 +367,7 @@ onMounted(() => {
   display: flex;
   justify-content: space-between;
   padding: 10px 16px;
-  background: rgba(255, 255, 255, 0.9);
-  backdrop-filter: blur(4px);
+  background: rgba(255, 255, 255, 0.95);
   font-size: 11px;
   color: #666;
 }
@@ -378,7 +377,7 @@ onMounted(() => {
   height: 100%;
   display: flex;
   flex-direction: column;
-  background: #f5f5f5;
+  background: #f0f0f0;
 }
 
 .detail-toolbar {
@@ -390,6 +389,7 @@ onMounted(() => {
   border-bottom: 1px solid #e0e0e0;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
   z-index: 10;
+  flex-shrink: 0;
 }
 
 .toolbar-left {
@@ -460,6 +460,7 @@ onMounted(() => {
   border-bottom: 1px solid #e0e0e0;
   padding: 16px 20px;
   animation: slideDown 0.3s ease;
+  flex-shrink: 0;
 }
 
 @keyframes slideDown {
@@ -539,30 +540,40 @@ onMounted(() => {
 }
 
 /* 编辑器主体 */
-.editor-container {
+.editor-wrapper {
   flex: 1;
+  overflow: hidden;
+  position: relative;
+}
+
+.editor-container {
+  height: 100%;
   overflow-y: auto;
   padding: 40px 20px;
-  min-height: 400px;
+  background-color: #f5f5f5;
+  background-size: contain;
+  background-position: center bottom;
+  background-repeat: no-repeat;
+  background-attachment: scroll;
 }
 
 .editor-paper {
-  max-width: 700px;
-  margin: 0 auto;
-  background: rgba(255, 255, 255, 0.92);
-  border-radius: 16px;
+  max-width: 680px;
+  margin: 0 auto 200px;
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 12px;
   padding: 48px 56px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-  backdrop-filter: blur(8px);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  min-height: 500px;
 }
 
 .paper-title {
-  font-size: 28px;
+  font-size: 26px;
   font-weight: 600;
   color: #2c3e50;
   text-align: center;
   margin-bottom: 32px;
-  font-family: 'STKaiti', 'KaiTi', 'SimKaiti', serif;
+  font-family: 'STKaiti', 'KaiTi', 'SimKaiti', 'Microsoft YaHei', serif;
   letter-spacing: 2px;
 }
 
@@ -572,14 +583,22 @@ onMounted(() => {
   line-height: 2;
   color: #333;
   outline: none;
-  font-family: 'STKaiti', 'KaiTi', 'SimKaiti', serif;
-  text-indent: 2em;
+  font-family: 'STKaiti', 'KaiTi', 'SimKaiti', 'Microsoft YaHei', serif;
 }
 
 .editor-content:empty::before {
   content: '在此输入文章内容...';
   color: #999;
   font-style: italic;
+}
+
+/* 移除拼音样式 */
+.editor-content :deep(ruby) {
+  display: inline;
+}
+
+.editor-content :deep(rt) {
+  display: none;
 }
 
 .editor-content :deep(p) {
@@ -594,7 +613,7 @@ onMounted(() => {
   text-align: right;
   font-size: 14px;
   color: #666;
-  font-family: 'STKaiti', 'KaiTi', 'SimKaiti', serif;
+  font-family: 'STKaiti', 'KaiTi', 'SimKaiti', 'Microsoft YaHei', serif;
 }
 
 .author {
@@ -607,6 +626,7 @@ onMounted(() => {
   background: white;
   border-top: 1px solid #e0e0e0;
   text-align: center;
+  flex-shrink: 0;
 }
 
 .save-status {
@@ -618,6 +638,7 @@ onMounted(() => {
 @media (max-width: 768px) {
   .editor-paper {
     padding: 32px 24px;
+    margin-bottom: 100px;
   }
   
   .paper-title {
